@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { supabase } from "@/lib/supabase";
+
+type Priority = "Tinggi" | "Sedang" | "Rendah";
 
 type Task = {
   id: number;
@@ -11,55 +20,52 @@ type Task = {
   selesai: boolean;
   deadline: string | null;
   urutan: number;
-  prioritas: "Tinggi" | "Sedang" | "Rendah";
+  prioritas: Priority;
 };
+
+const priorities: Priority[] = ["Tinggi", "Sedang", "Rendah"];
+
+const priorityText: Record<Priority, string> = {
+  Tinggi: "Mendesak",
+  Sedang: "Normal",
+  Rendah: "Tidak Mendesak",
+};
+
+const monthNames = [
+  "Januari", "Februari", "Maret", "April",
+  "Mei", "Juni", "Juli", "Agustus",
+  "September", "Oktober", "November", "Desember",
+];
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [judul, setJudul] = useState("");
   const [deskripsi, setDeskripsi] = useState("");
   const [deadline, setDeadline] = useState("");
-  const [prioritas, setPrioritas] = useState<"Tinggi" | "Sedang" | "Rendah">("Sedang");
+  const [prioritas, setPrioritas] = useState<Priority>("Sedang");
   const [editId, setEditId] = useState<number | null>(null);
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState("");
   const [activePage, setActivePage] = useState("Dashboard");
-  const [calendarDate, setCalendarDate] = useState(new Date(2000, 0, 1));
+  const [calendarDate, setCalendarDate] = useState(new Date());
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
 
-  const notifiedTasks = useRef<Set<number>>(new Set());
+  const notifiedTasks = useRef(new Set<number>());
+  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    setCalendarDate(new Date());
-  }, []);
-
-  const monthNames = [
-    "Januari", "Februari", "Maret", "April",
-    "Mei", "Juni", "Juli", "Agustus",
-    "September", "Oktober", "November", "Desember"
-  ];
-
-  const firstDay = new Date(
-    calendarDate.getFullYear(),
-    calendarDate.getMonth(),
-    1
-  ).getDay();
-
-  const daysInMonth = new Date(
-    calendarDate.getFullYear(),
-    calendarDate.getMonth() + 1,
-    0
-  ).getDate();
-
-  async function loadTasks() {
+  const loadTasks = useCallback(async () => {
     const { data, error } = await supabase
       .from("project1")
       .select("*")
       .order("urutan", { ascending: true })
       .order("id", { ascending: false });
+
+    if (!mountedRef.current) return;
 
     if (error) {
       setError(error.message);
@@ -69,16 +75,16 @@ export default function Home() {
     }
 
     setLoading(false);
-  }
+  }, []);
 
-  // SESSION: MEMERIKSA LOGIN
+  // Pemeriksaan sesi login
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
 
     async function checkLogin() {
       const { data, error } = await supabase.auth.getSession();
 
-      if (!mounted) return;
+      if (!mountedRef.current) return;
 
       if (error || !data.session) {
         window.location.replace("/login");
@@ -101,56 +107,48 @@ export default function Home() {
     });
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadTasks]);
 
-  // AUTO LOGOUT SETELAH 30 MENIT TIDAK AKTIF
+  // Auto logout setelah 30 menit tidak aktif
   useEffect(() => {
     if (!sessionActive) return;
 
-    const INACTIVITY_LIMIT = 30 * 60 * 1000;
+    const inactivityLimit = 30 * 60 * 1000;
     let timeout: ReturnType<typeof setTimeout>;
 
-    const resetSessionTimer = () => {
+    const resetTimer = () => {
       clearTimeout(timeout);
-
       timeout = setTimeout(async () => {
         await supabase.auth.signOut();
         window.location.replace("/login");
-      }, INACTIVITY_LIMIT);
+      }, inactivityLimit);
     };
 
-    const activityEvents = [
-      "mousemove",
-      "mousedown",
-      "keydown",
-      "scroll",
-      "touchstart",
-      "click",
-    ];
+    const events = ["pointerdown", "keydown", "scroll", "touchstart"];
 
-    activityEvents.forEach((event) => {
-      window.addEventListener(event, resetSessionTimer);
-    });
+    events.forEach((event) =>
+      window.addEventListener(event, resetTimer, { passive: true })
+    );
 
-    resetSessionTimer();
+    resetTimer();
 
     return () => {
       clearTimeout(timeout);
-      activityEvents.forEach((event) => {
-        window.removeEventListener(event, resetSessionTimer);
-      });
+      events.forEach((event) =>
+        window.removeEventListener(event, resetTimer)
+      );
     };
   }, [sessionActive]);
 
-  // NOTIFIKASI DEADLINE
+  // Pengingat deadline
   useEffect(() => {
-    function checkDeadlines() {
-      if (!("Notification" in window)) return;
-      if (Notification.permission !== "granted") return;
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
 
+    const checkDeadlines = () => {
       const now = Date.now();
       const oneDay = 24 * 60 * 60 * 1000;
 
@@ -158,8 +156,7 @@ export default function Home() {
         if (!task.deadline || task.selesai) return;
         if (notifiedTasks.current.has(task.id)) return;
 
-        const remaining =
-          new Date(task.deadline).getTime() - now;
+        const remaining = new Date(task.deadline).getTime() - now;
 
         if (remaining > 0 && remaining <= oneDay) {
           new Notification("Pengingat TaskFlow!", {
@@ -169,12 +166,12 @@ export default function Home() {
           notifiedTasks.current.add(task.id);
         }
       });
-    }
+    };
 
     checkDeadlines();
-    const interval = setInterval(checkDeadlines, 60000);
+    const interval = window.setInterval(checkDeadlines, 60000);
 
-    return () => clearInterval(interval);
+    return () => window.clearInterval(interval);
   }, [tasks]);
 
   async function enableNotifications() {
@@ -195,24 +192,36 @@ export default function Home() {
     }
   }
 
-  // TAMBAH DAN EDIT TASK
+  function resetForm() {
+    setJudul("");
+    setDeskripsi("");
+    setDeadline("");
+    setPrioritas("Sedang");
+    setEditId(null);
+  }
+
+  // Tambah dan edit task
   async function saveTask(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (saving) return;
+
     setError("");
 
-    const values = {
-      judul: judul.trim(),
-      deskripsi: deskripsi.trim(),
-      deadline: deadline
-        ? new Date(deadline).toISOString()
-        : null,
-      prioritas,
-    };
+    const cleanTitle = judul.trim();
 
-    if (!values.judul) {
+    if (!cleanTitle) {
       setError("Judul task wajib diisi.");
       return;
     }
+
+    setSaving(true);
+
+    const values = {
+      judul: cleanTitle,
+      deskripsi: deskripsi.trim(),
+      deadline: deadline ? new Date(`${deadline}T12:00:00`).toISOString() : null,
+      prioritas,
+    };
 
     let result;
 
@@ -221,15 +230,12 @@ export default function Home() {
         .from("project1")
         .insert([{ ...values, selesai: false }]);
     } else {
-      const taskToEdit = tasks.find((task) => task.id === editId);
+      const task = tasks.find((item) => item.id === editId);
 
-      if (!taskToEdit || taskToEdit.selesai) {
-        setError("Task sudah selesai. Tekan Undo terlebih dahulu untuk mengedit.");
-        setEditId(null);
-        setJudul("");
-        setDeskripsi("");
-        setDeadline("");
-        setPrioritas("Sedang");
+      if (!task || task.selesai) {
+        setError("Task sudah selesai. Tekan Undo terlebih dahulu.");
+        setSaving(false);
+        resetForm();
         return;
       }
 
@@ -242,19 +248,15 @@ export default function Home() {
 
     if (result.error) {
       setError(result.error.message);
+      setSaving(false);
       return;
     }
 
-    setJudul("");
-    setDeskripsi("");
-    setDeadline("");
-    setPrioritas("Sedang");
-    setEditId(null);
-
+    resetForm();
     await loadTasks();
+    setSaving(false);
   }
 
-  // HAPUS TASK
   async function deleteTask(id: number) {
     if (!window.confirm("Yakin ingin menghapus task ini?")) return;
 
@@ -267,7 +269,6 @@ export default function Home() {
     else await loadTasks();
   }
 
-  // COMPLETE DAN UNDO
   async function toggleTask(task: Task) {
     const { error } = await supabase
       .from("project1")
@@ -279,18 +280,11 @@ export default function Home() {
       return;
     }
 
-    if (!task.selesai && editId === task.id) {
-      setEditId(null);
-      setJudul("");
-      setDeskripsi("");
-      setDeadline("");
-      setPrioritas("Sedang");
-    }
+    if (!task.selesai && editId === task.id) resetForm();
 
     await loadTasks();
   }
 
-  // EDIT TASK: HANYA TASK YANG BELUM SELESAI
   function editTask(task: Task) {
     if (task.selesai) {
       setError("Task sudah selesai. Tekan Undo terlebih dahulu untuk mengedit.");
@@ -301,53 +295,50 @@ export default function Home() {
     setEditId(task.id);
     setJudul(task.judul);
     setDeskripsi(task.deskripsi ?? "");
-    setDeadline(task.deadline ? task.deadline.slice(0, 10) : "");
+    setDeadline(
+      task.deadline
+        ? new Date(task.deadline).toLocaleDateString("en-CA")
+        : ""
+    );
     setPrioritas(task.prioritas ?? "Sedang");
     setActivePage("Tasks");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  // DRAG AND DROP
+  // Drag and drop untuk mengurutkan task
   async function handleDrop(targetId: number) {
     if (
       draggedTaskId === null ||
       draggedTaskId === targetId ||
       savingOrder
-    ) {
-      return;
-    }
+    ) return;
 
-    const orderedTasks = [...tasks].sort(
+    const ordered = [...tasks].sort(
       (a, b) => a.urutan - b.urutan
     );
 
-    const fromIndex = orderedTasks.findIndex(
-      (task) => task.id === draggedTaskId
-    );
+    const from = ordered.findIndex((task) => task.id === draggedTaskId);
+    const to = ordered.findIndex((task) => task.id === targetId);
 
-    const toIndex = orderedTasks.findIndex(
-      (task) => task.id === targetId
-    );
-
-    if (fromIndex === -1 || toIndex === -1) {
+    if (from < 0 || to < 0) {
       setDraggedTaskId(null);
       return;
     }
 
-    const [movedTask] = orderedTasks.splice(fromIndex, 1);
-    orderedTasks.splice(toIndex, 0, movedTask);
+    const [moved] = ordered.splice(from, 1);
+    ordered.splice(to, 0, moved);
 
-    const updatedTasks = orderedTasks.map((task, index) => ({
+    const updated = ordered.map((task, index) => ({
       ...task,
       urutan: index + 1,
     }));
 
-    setTasks(updatedTasks);
+    setTasks(updated);
     setDraggedTaskId(null);
     setSavingOrder(true);
     setError("");
 
-    for (const task of updatedTasks) {
+    for (const task of updated) {
       const { error } = await supabase
         .from("project1")
         .update({ urutan: task.urutan })
@@ -365,30 +356,82 @@ export default function Home() {
     setSavingOrder(false);
   }
 
-  // LOGOUT
   async function handleLogout() {
     await supabase.auth.signOut();
     window.location.replace("/login");
   }
 
-  const completedTasks = tasks.filter((task) => task.selesai).length;
+  const completedTasks = useMemo(
+    () => tasks.filter((task) => task.selesai).length,
+    [tasks]
+  );
+
   const pendingTasks = tasks.length - completedTasks;
 
-  // KALENDER DEADLINE
+  const calendarDays = useMemo(() => {
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    return {
+      firstDay,
+      days: Array.from({ length: daysInMonth }, (_, index) => index + 1),
+    };
+  }, [calendarDate]);
+
+  const calendarTasks = useMemo(() => {
+    const grouped: Record<number, Task[]> = {};
+
+    tasks.forEach((task) => {
+      if (!task.deadline) return;
+      const date = new Date(task.deadline);
+
+      if (
+        date.getMonth() !== calendarDate.getMonth() ||
+        date.getFullYear() !== calendarDate.getFullYear()
+      ) return;
+
+      const day = date.getDate();
+      if (!grouped[day]) grouped[day] = [];
+      grouped[day].push(task);
+    });
+
+    return grouped;
+  }, [tasks, calendarDate]);
+
+  const monthlyTasks = useMemo(
+    () =>
+      tasks.filter((task) => {
+        if (!task.deadline) return false;
+        const date = new Date(task.deadline);
+
+        return (
+          date.getMonth() === calendarDate.getMonth() &&
+          date.getFullYear() === calendarDate.getFullYear()
+        );
+      }),
+    [tasks, calendarDate]
+  );
+
+  function changeMonth(amount: number) {
+    setCalendarDate(
+      new Date(
+        calendarDate.getFullYear(),
+        calendarDate.getMonth() + amount,
+        1
+      )
+    );
+  }
+
   function renderCalendar() {
     return (
-      <div className="calendar-card">
+      <section className="calendar-card">
         <div className="calendar-header">
           <button
-            onClick={() =>
-              setCalendarDate(
-                new Date(
-                  calendarDate.getFullYear(),
-                  calendarDate.getMonth() - 1,
-                  1
-                )
-              )
-            }
+            type="button"
+            aria-label="Bulan sebelumnya"
+            onClick={() => changeMonth(-1)}
           >
             ←
           </button>
@@ -399,18 +442,19 @@ export default function Home() {
           </h2>
 
           <button
-            onClick={() =>
-              setCalendarDate(
-                new Date(
-                  calendarDate.getFullYear(),
-                  calendarDate.getMonth() + 1,
-                  1
-                )
-              )
-            }
+            type="button"
+            aria-label="Bulan berikutnya"
+            onClick={() => changeMonth(1)}
           >
             →
           </button>
+        </div>
+
+        <div className="calendar-legend">
+          <span><i className="legend-high" /> Mendesak</span>
+          <span><i className="legend-medium" /> Normal</span>
+          <span><i className="legend-low" /> Tidak mendesak</span>
+          <span><i className="legend-done" /> Selesai</span>
         </div>
 
         <div className="calendar-grid">
@@ -418,44 +462,27 @@ export default function Home() {
             <strong key={day}>{day}</strong>
           ))}
 
-          {Array.from({ length: firstDay }).map((_, i) => (
-            <div key={`empty-${i}`} />
+          {Array.from({ length: calendarDays.firstDay }).map((_, index) => (
+            <div className="calendar-empty" key={`empty-${index}`} />
           ))}
 
-          {Array.from({ length: daysInMonth }).map((_, i) => {
-            const day = i + 1;
-
-            const deadlineTasks = tasks.filter((task) => {
-              if (!task.deadline) return false;
-
-              const date = new Date(task.deadline);
-
-              return (
-                date.getDate() === day &&
-                date.getMonth() === calendarDate.getMonth() &&
-                date.getFullYear() === calendarDate.getFullYear()
-              );
-            });
-
+          {calendarDays.days.map((day) => {
+            const dayTasks = calendarTasks[day] ?? [];
             const allCompleted =
-              deadlineTasks.length > 0 &&
-              deadlineTasks.every((task) => task.selesai);
+              dayTasks.length > 0 &&
+              dayTasks.every((task) => task.selesai);
 
             return (
               <div
                 key={day}
                 className={`calendar-day ${
-                  deadlineTasks.length
-                    ? allCompleted
-                      ? "deadline-completed"
-                      : "has-deadline"
-                    : ""
-                }`}
+                  allCompleted ? "deadline-completed" : ""
+                } ${dayTasks.length ? "has-deadline" : ""}`}
               >
-                <strong>{day}</strong>
+                <strong className="calendar-number">{day}</strong>
 
                 <div className="calendar-task-names">
-                  {deadlineTasks.map((task) => (
+                  {dayTasks.map((task) => (
                     <div
                       key={task.id}
                       className={`calendar-task-name ${
@@ -476,42 +503,43 @@ export default function Home() {
 
         <h3 className="upcoming-title">Deadline Bulan Ini</h3>
 
-        {tasks.filter((task) => {
-          if (!task.deadline) return false;
-          const date = new Date(task.deadline);
-
-          return (
-            date.getMonth() === calendarDate.getMonth() &&
-            date.getFullYear() === calendarDate.getFullYear()
-          );
-        }).length === 0 ? (
-          <p>Belum ada deadline bulan ini.</p>
+        {monthlyTasks.length === 0 ? (
+          <p className="empty-state">Belum ada deadline bulan ini.</p>
         ) : (
-          tasks
-            .filter((task) => {
-              if (!task.deadline) return false;
-              const date = new Date(task.deadline);
-
-              return (
-                date.getMonth() === calendarDate.getMonth() &&
-                date.getFullYear() === calendarDate.getFullYear()
-              );
-            })
+          monthlyTasks
+            .slice()
+            .sort(
+              (a, b) =>
+                new Date(a.deadline!).getTime() -
+                new Date(b.deadline!).getTime()
+            )
             .map((task) => (
               <div className="deadline-item" key={task.id}>
-                <div>
+                <div className="deadline-info">
                   <strong>{task.judul}</strong>
                   <p>
                     {new Date(task.deadline!).toLocaleDateString("id-ID")}
                   </p>
                 </div>
-                <span>
+
+                <span className={task.selesai ? "status-done" : "status-pending"}>
                   {task.selesai ? "Selesai" : "Belum selesai"}
                 </span>
               </div>
             ))
         )}
-      </div>
+      </section>
+    );
+  }
+
+  function renderPriority(task: Task) {
+    const priority = task.prioritas ?? "Sedang";
+
+    return (
+      <span className={`priority-badge priority-${priority.toLowerCase()}`}>
+        <span className="priority-dot" />
+        {priority} · {priorityText[priority]}
+      </span>
     );
   }
 
@@ -520,29 +548,38 @@ export default function Home() {
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-icon">✓</span>
-          TaskFlow
+          <span>TaskFlow</span>
         </div>
 
         <p className="sidebar-label">MENU UTAMA</p>
 
-        {[
-          { name: "Dashboard", icon: "▦" },
-          { name: "Tasks", icon: "☑" },
-          { name: "Calendar", icon: "▣" },
-        ].map((item) => (
-          <button
-            key={item.name}
-            className={`nav-item ${activePage === item.name ? "active" : ""}`}
-            onClick={() => setActivePage(item.name)}
-          >
-            <span>{item.icon}</span>
-            {item.name}
-          </button>
-        ))}
+        <nav className="navigation">
+          {[
+            { name: "Dashboard", icon: "▦" },
+            { name: "Tasks", icon: "☑" },
+            { name: "Calendar", icon: "▣" },
+          ].map((item) => (
+            <button
+              type="button"
+              key={item.name}
+              className={`nav-item ${
+                activePage === item.name ? "active" : ""
+              }`}
+              onClick={() => setActivePage(item.name)}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              {item.name}
+            </button>
+          ))}
+        </nav>
 
         <div className="sidebar-bottom">
-          <button className="nav-item logout-link" onClick={handleLogout}>
-            <span>↪</span>
+          <button
+            type="button"
+            className="nav-item logout-link"
+            onClick={handleLogout}
+          >
+            <span className="nav-icon">↪</span>
             Logout
           </button>
         </div>
@@ -551,15 +588,19 @@ export default function Home() {
       <main className="main-content">
         <header className="topbar">
           <div>
+            <p className="eyebrow">WORKSPACE</p>
             <h1>{activePage}</h1>
-            <p>Welcome to your TaskFlow workspace.</p>
+            <p className="topbar-description">
+              Welcome to your TaskFlow workspace.
+            </p>
           </div>
 
           <button
+            type="button"
             className="notification-button"
             onClick={enableNotifications}
           >
-            Aktifkan Notifikasi
+            <span>♧</span> Aktifkan Notifikasi
           </button>
         </header>
 
@@ -567,140 +608,205 @@ export default function Home() {
           <p className="success-message">{notificationStatus}</p>
         )}
 
-        {error && <p className="error-message">{error}</p>}
+        {error && (
+          <div className="error-message" role="alert">
+            {error}
+          </div>
+        )}
 
         {activePage === "Dashboard" && (
           <>
-            <h2 className="section-title">Overview</h2>
+            <div className="section-heading">
+              <div>
+                <h2>Overview</h2>
+                <p>Ringkasan aktivitas tugas kamu.</p>
+              </div>
+            </div>
 
             <div className="stats-grid">
-              <div className="stat-card">
-                <span>Total Tasks</span>
+              <div className="stat-card stat-blue">
+                <span className="stat-icon">▤</span>
+                <p>Total Tasks</p>
                 <strong>{tasks.length}</strong>
               </div>
-              <div className="stat-card">
-                <span>Completed</span>
+
+              <div className="stat-card stat-green">
+                <span className="stat-icon">✓</span>
+                <p>Completed</p>
                 <strong>{completedTasks}</strong>
               </div>
-              <div className="stat-card">
-                <span>In Progress</span>
+
+              <div className="stat-card stat-orange">
+                <span className="stat-icon">◷</span>
+                <p>In Progress</p>
                 <strong>{pendingTasks}</strong>
               </div>
             </div>
 
-            <div className="content-card">
-              <h2>Recent Tasks</h2>
-              {tasks.length === 0 ? (
-                <p>Belum ada task. Tambahkan task pertamamu!</p>
+            <section className="content-card">
+              <div className="card-heading">
+                <div>
+                  <h2>Recent Tasks</h2>
+                  <p>Lima tugas terbaru kamu.</p>
+                </div>
+
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => setActivePage("Tasks")}
+                >
+                  Lihat semua →
+                </button>
+              </div>
+
+              {loading ? (
+                <p className="empty-state">Memuat tugas...</p>
+              ) : tasks.length === 0 ? (
+                <p className="empty-state">
+                  Belum ada task. Tambahkan task pertamamu!
+                </p>
               ) : (
                 tasks.slice(0, 5).map((task) => (
-                  <div className="task-row" key={task.id}>
-                    <div>
-                      <strong>{task.judul}</strong>
-                      <p>{task.deskripsi}</p>
-                      <span className={`priority-badge priority-${(task.prioritas ?? "Sedang").toLowerCase()}`}>
-                        Prioritas: {task.prioritas ?? "Sedang"}
-                      </span>
+                  <div className="task-row dashboard-task" key={task.id}>
+                    <div className="task-info">
+                      <strong className={task.selesai ? "task-completed" : ""}>
+                        {task.judul}
+                      </strong>
+                      <p>{task.deskripsi || "Tidak ada deskripsi."}</p>
+                      {renderPriority(task)}
                     </div>
-                    <span
-                      className={
-                        task.selesai ? "status-done" : "status-pending"
-                      }
-                    >
+
+                    <span className={task.selesai ? "status-done" : "status-pending"}>
                       {task.selesai ? "Completed" : "In Progress"}
                     </span>
                   </div>
                 ))
               )}
-            </div>
+            </section>
           </>
         )}
 
         {activePage === "Tasks" && (
           <>
-            <div className="page-heading">
+            <div className="section-heading">
               <div>
-                <h2 className="section-title">My Tasks</h2>
-                <p>Kelola semua tugasmu di sini.</p>
+                <h2>My Tasks</h2>
+                <p>Kelola dan atur prioritas semua tugasmu.</p>
               </div>
             </div>
 
             <form className="task-form" onSubmit={saveTask}>
-              <h3>{editId === null ? "Add New Task" : "Edit Task"}</h3>
+              <div className="form-title">
+                <div className="form-title-icon">＋</div>
+                <div>
+                  <h3>{editId === null ? "Add New Task" : "Edit Task"}</h3>
+                  <p>Lengkapi informasi tugas di bawah ini.</p>
+                </div>
+              </div>
 
+              <label htmlFor="task-title">Judul tugas</label>
               <input
-                placeholder="Task title"
+                id="task-title"
+                placeholder="Contoh: Mengerjakan tugas matematika"
                 value={judul}
                 onChange={(e) => setJudul(e.target.value)}
                 required
               />
 
+              <label htmlFor="task-description">Deskripsi</label>
               <textarea
-                placeholder="Task description"
+                id="task-description"
+                placeholder="Tambahkan detail tugas..."
                 value={deskripsi}
                 onChange={(e) => setDeskripsi(e.target.value)}
               />
 
-              <label htmlFor="prioritas">Skala Prioritas</label>
-              <select
-                id="prioritas"
-                value={prioritas}
-                onChange={(e) => setPrioritas(e.target.value as "Tinggi" | "Sedang" | "Rendah")}
-              >
-                <option value="Tinggi">🔴 Tinggi — Mendesak</option>
-                <option value="Sedang">🟠 Sedang — Normal</option>
-                <option value="Rendah">🟢 Rendah — Tidak Mendesak</option>
-              </select>
+              <div className="form-two-columns">
+                <div className="form-field">
+                  <label htmlFor="prioritas">Skala prioritas</label>
+                  <select
+                    id="prioritas"
+                    value={prioritas}
+                    onChange={(e) =>
+                      setPrioritas(e.target.value as Priority)
+                    }
+                  >
+                    <option value="Tinggi">🔴 Tinggi — Mendesak</option>
+                    <option value="Sedang">🟠 Sedang — Normal</option>
+                    <option value="Rendah">🟢 Rendah — Tidak Mendesak</option>
+                  </select>
+                </div>
 
-              <label>Deadline</label>
-              <input
-                type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="task-deadline">Deadline</label>
+                  <input
+                    id="task-deadline"
+                    type="date"
+                    value={deadline}
+                    onChange={(e) => setDeadline(e.target.value)}
+                  />
+                </div>
+              </div>
 
               <div className="form-actions">
-                <button className="primary-button" type="submit">
-                  {editId === null ? "Add Task" : "Save Changes"}
+                <button
+                  className="primary-button"
+                  type="submit"
+                  disabled={saving}
+                >
+                  {saving
+                    ? "Menyimpan..."
+                    : editId === null
+                      ? "＋ Add Task"
+                      : "Simpan Perubahan"}
                 </button>
 
                 {editId !== null && (
                   <button
                     className="cancel-button"
                     type="button"
-                    onClick={() => {
-                      setEditId(null);
-                      setJudul("");
-                      setDeskripsi("");
-                      setDeadline("");
-                      setPrioritas("Sedang");
-                    }}
+                    onClick={resetForm}
                   >
-                    Cancel
+                    Batal
                   </button>
                 )}
               </div>
             </form>
 
-            <div className="content-card">
-              <h2>All Tasks ({tasks.length})</h2>
+            <section className="content-card">
+              <div className="card-heading">
+                <div>
+                  <h2>All Tasks ({tasks.length})</h2>
+                  <p>Geser tugas untuk mengubah urutannya.</p>
+                </div>
+              </div>
 
-              <p className="drag-instruction">
-                ☰ Tahan dan geser task untuk mengubah urutannya.
-              </p>
+              <div className="priority-guide">
+                {priorities.map((priority) => (
+                  <div className="priority-guide-item" key={priority}>
+                    <span className={`priority-dot dot-${priority.toLowerCase()}`} />
+                    <span>{priority}</span>
+                    <small>{priorityText[priority]}</small>
+                  </div>
+                ))}
+              </div>
 
-              {savingOrder && <p>Menyimpan urutan task...</p>}
+              {savingOrder && (
+                <p className="saving-order">Menyimpan urutan tugas...</p>
+              )}
 
               {loading ? (
-                <p>Loading...</p>
+                <p className="empty-state">Memuat tugas...</p>
               ) : tasks.length === 0 ? (
-                <p>Belum ada task. Tambahkan task pertamamu!</p>
+                <p className="empty-state">
+                  Belum ada task. Tambahkan task pertamamu!
+                </p>
               ) : (
                 tasks.map((task) => (
-                  <div
-                    className={`task-row ${
+                  <article
+                    className={`task-row task-list-row ${
                       draggedTaskId === task.id ? "dragging" : ""
-                    }`}
+                    } ${task.selesai ? "completed-row" : ""}`}
                     key={task.id}
                     draggable={!savingOrder}
                     onDragStart={() => setDraggedTaskId(task.id)}
@@ -711,52 +817,44 @@ export default function Home() {
                     }}
                     onDragEnd={() => setDraggedTaskId(null)}
                   >
+                    <div className="drag-handle" aria-label="Geser tugas">
+                      ⠿
+                    </div>
+
                     <div className="task-info">
-                      <strong
-                        className={task.selesai ? "task-completed" : ""}
-                      >
+                      <strong className={task.selesai ? "task-completed" : ""}>
                         {task.judul}
                       </strong>
 
-                      <p>{task.deskripsi}</p>
+                      <p>{task.deskripsi || "Tidak ada deskripsi."}</p>
 
-                      <small>
-                        Deadline:{" "}
-                        {task.deadline
-                          ? new Date(task.deadline).toLocaleDateString("id-ID")
-                          : "Belum ditentukan"}
-                      </small>
-
-                      <span className={`priority-badge priority-${(task.prioritas ?? "Sedang").toLowerCase()}`}>
-                        {task.prioritas === "Tinggi"
-                          ? "🔴 Tinggi — Mendesak"
-                          : task.prioritas === "Rendah"
-                            ? "🟢 Rendah — Tidak Mendesak"
-                            : "🟠 Sedang — Normal"}
-                      </span>
-
-                      <span
-                        className={
-                          task.selesai ? "status-done" : "status-pending"
-                        }
-                      >
-                        {task.selesai ? "Completed" : "In Progress"}
-                      </span>
+                      <div className="task-meta">
+                        <span className="deadline-label">
+                          ◷{" "}
+                          {task.deadline
+                            ? new Date(task.deadline).toLocaleDateString("id-ID")
+                            : "Belum ada deadline"}
+                        </span>
+                        {renderPriority(task)}
+                        <span className={task.selesai ? "status-done" : "status-pending"}>
+                          {task.selesai ? "Completed" : "In Progress"}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="task-actions">
                       <button
                         type="button"
-                        draggable={false}
+                        className={task.selesai ? "undo-button" : "complete-button"}
                         onClick={() => toggleTask(task)}
                       >
-                        {task.selesai ? "Undo" : "Complete"}
+                        {task.selesai ? "↶ Undo" : "✓ Complete"}
                       </button>
 
                       {!task.selesai && (
                         <button
                           type="button"
-                          draggable={false}
+                          className="edit-button"
                           onClick={() => editTask(task)}
                         >
                           Edit
@@ -766,25 +864,26 @@ export default function Home() {
                       <button
                         type="button"
                         className="delete-button"
-                        draggable={false}
                         onClick={() => deleteTask(task.id)}
                       >
-                        Delete
+                        Hapus
                       </button>
                     </div>
-                  </div>
+                  </article>
                 ))
               )}
-            </div>
+            </section>
           </>
         )}
 
         {activePage === "Calendar" && (
           <>
-            <h2 className="section-title">Calendar Deadline</h2>
-            <p className="page-description">
-              Lihat jadwal dan deadline semua task kamu.
-            </p>
+            <div className="section-heading">
+              <div>
+                <h2>Calendar Deadline</h2>
+                <p>Lihat jadwal dan deadline semua tugasmu.</p>
+              </div>
+            </div>
             {renderCalendar()}
           </>
         )}
