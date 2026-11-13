@@ -1,6 +1,8 @@
+
 "use client";
 
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -23,19 +25,59 @@ type Task = {
   prioritas: Priority;
 };
 
-const priorities: Priority[] = ["Tinggi", "Sedang", "Rendah"];
+const MONTH_NAMES = [
+  "Januari", "Februari", "Maret", "April",
+  "Mei", "Juni", "Juli", "Agustus",
+  "September", "Oktober", "November", "Desember",
+];
 
-const priorityText: Record<Priority, string> = {
+const WEEK_DAYS = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+
+const PRIORITY_LABEL: Record<Priority, string> = {
   Tinggi: "Mendesak",
   Sedang: "Normal",
   Rendah: "Tidak Mendesak",
 };
 
-const monthNames = [
-  "Januari", "Februari", "Maret", "April",
-  "Mei", "Juni", "Juli", "Agustus",
-  "September", "Oktober", "November", "Desember",
-];
+const PRIORITY_CLASS: Record<Priority, string> = {
+  Tinggi: "priority-tinggi",
+  Sedang: "priority-sedang",
+  Rendah: "priority-rendah",
+};
+
+function getPriority(task: Task): Priority {
+  if (
+    task.prioritas === "Tinggi" ||
+    task.prioritas === "Rendah"
+  ) {
+    return task.prioritas;
+  }
+
+  return "Sedang";
+}
+
+function TaskPriority({ task }: { task: Task }) {
+  const priority = getPriority(task);
+
+  return (
+    <span className={`priority-badge ${PRIORITY_CLASS[priority]}`}>
+      <span className="priority-indicator" />
+      {priority} — {PRIORITY_LABEL[priority]}
+    </span>
+  );
+}
+
+const TaskPriorityMemo = memo(TaskPriority);
+
+function TaskStatus({ completed }: { completed: boolean }) {
+  return (
+    <span className={completed ? "status-done" : "status-pending"}>
+      {completed ? "Completed" : "In Progress"}
+    </span>
+  );
+}
+
+const TaskStatusMemo = memo(TaskStatus);
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -43,32 +85,112 @@ export default function Home() {
   const [deskripsi, setDeskripsi] = useState("");
   const [deadline, setDeadline] = useState("");
   const [prioritas, setPrioritas] = useState<Priority>("Sedang");
-  const [editId, setEditId] = useState<number | null>(null);
 
+  const [editId, setEditId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
   const [notificationStatus, setNotificationStatus] = useState("");
   const [activePage, setActivePage] = useState("Dashboard");
   const [calendarDate, setCalendarDate] = useState(new Date());
+
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
 
-  const notifiedTasks = useRef(new Set<number>());
-  const mountedRef = useRef(true);
+  const notifiedTasks = useRef<Set<number>>(new Set());
+
+  // ==========================================
+  // DATA KALENDER DIHITUNG SEKALI
+  // ==========================================
+
+  const calendarInfo = useMemo(() => {
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+
+    return {
+      year,
+      month,
+      firstDay: new Date(year, month, 1).getDay(),
+      daysInMonth: new Date(year, month + 1, 0).getDate(),
+      monthName: MONTH_NAMES[month],
+    };
+  }, [calendarDate]);
+
+  const deadlineByDay = useMemo(() => {
+    const result = new Map<number, Task[]>();
+
+    tasks.forEach((task) => {
+      if (!task.deadline) return;
+
+      const date = new Date(task.deadline);
+
+      if (
+        date.getFullYear() !== calendarInfo.year ||
+        date.getMonth() !== calendarInfo.month
+      ) {
+        return;
+      }
+
+      const day = date.getDate();
+      const current = result.get(day) ?? [];
+
+      current.push(task);
+      result.set(day, current);
+    });
+
+    return result;
+  }, [tasks, calendarInfo]);
+
+  const monthlyTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      if (!task.deadline) return false;
+
+      const date = new Date(task.deadline);
+
+      return (
+        date.getFullYear() === calendarInfo.year &&
+        date.getMonth() === calendarInfo.month
+      );
+    });
+  }, [tasks, calendarInfo]);
+
+  const completedTasks = useMemo(
+    () => tasks.filter((task) => task.selesai).length,
+    [tasks]
+  );
+
+  const pendingTasks = tasks.length - completedTasks;
+
+  const priorityCounts = useMemo(
+    () => ({
+      tinggi: tasks.filter(
+        (task) => !task.selesai && getPriority(task) === "Tinggi"
+      ).length,
+      sedang: tasks.filter(
+        (task) => !task.selesai && getPriority(task) === "Sedang"
+      ).length,
+      rendah: tasks.filter(
+        (task) => !task.selesai && getPriority(task) === "Rendah"
+      ).length,
+    }),
+    [tasks]
+  );
+
+  // ==========================================
+  // LOAD TASKS
+  // ==========================================
 
   const loadTasks = useCallback(async () => {
-    const { data, error } = await supabase
+    const { data, error: fetchError } = await supabase
       .from("project1")
       .select("*")
       .order("urutan", { ascending: true })
       .order("id", { ascending: false });
 
-    if (!mountedRef.current) return;
-
-    if (error) {
-      setError(error.message);
+    if (fetchError) {
+      setError(fetchError.message);
     } else {
       setTasks((data ?? []) as Task[]);
       setError("");
@@ -77,16 +199,20 @@ export default function Home() {
     setLoading(false);
   }, []);
 
-  // Pemeriksaan sesi login
+  // ==========================================
+  // AUTHENTICATION
+  // ==========================================
+
   useEffect(() => {
-    mountedRef.current = true;
+    let mounted = true;
 
     async function checkLogin() {
-      const { data, error } = await supabase.auth.getSession();
+      const { data, error: authError } =
+        await supabase.auth.getSession();
 
-      if (!mountedRef.current) return;
+      if (!mounted) return;
 
-      if (error || !data.session) {
+      if (authError || !data.session) {
         window.location.replace("/login");
         return;
       }
@@ -107,48 +233,64 @@ export default function Home() {
     });
 
     return () => {
-      mountedRef.current = false;
+      mounted = false;
       subscription.unsubscribe();
     };
   }, [loadTasks]);
 
-  // Auto logout setelah 30 menit tidak aktif
+  // ==========================================
+  // AUTO LOGOUT 30 MENIT
+  // Menghindari event mousemove yang terlalu sering
+  // ==========================================
+
   useEffect(() => {
     if (!sessionActive) return;
 
-    const inactivityLimit = 30 * 60 * 1000;
+    const INACTIVITY_LIMIT = 30 * 60 * 1000;
     let timeout: ReturnType<typeof setTimeout>;
 
     const resetTimer = () => {
       clearTimeout(timeout);
+
       timeout = setTimeout(async () => {
         await supabase.auth.signOut();
         window.location.replace("/login");
-      }, inactivityLimit);
+      }, INACTIVITY_LIMIT);
     };
 
-    const events = ["pointerdown", "keydown", "scroll", "touchstart"];
+    const events = [
+      "pointerdown",
+      "keydown",
+      "scroll",
+      "touchstart",
+    ];
 
-    events.forEach((event) =>
-      window.addEventListener(event, resetTimer, { passive: true })
-    );
+    events.forEach((event) => {
+      window.addEventListener(event, resetTimer, { passive: true });
+    });
 
     resetTimer();
 
     return () => {
       clearTimeout(timeout);
-      events.forEach((event) =>
-        window.removeEventListener(event, resetTimer)
-      );
+
+      events.forEach((event) => {
+        window.removeEventListener(event, resetTimer);
+      });
     };
   }, [sessionActive]);
 
-  // Pengingat deadline
-  useEffect(() => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    if (Notification.permission !== "granted") return;
+  // ==========================================
+  // NOTIFIKASI DEADLINE
+  // ==========================================
 
-    const checkDeadlines = () => {
+  useEffect(() => {
+    if (!sessionActive) return;
+
+    function checkDeadlines() {
+      if (!("Notification" in window)) return;
+      if (Notification.permission !== "granted") return;
+
       const now = Date.now();
       const oneDay = 24 * 60 * 60 * 1000;
 
@@ -156,7 +298,8 @@ export default function Home() {
         if (!task.deadline || task.selesai) return;
         if (notifiedTasks.current.has(task.id)) return;
 
-        const remaining = new Date(task.deadline).getTime() - now;
+        const remaining =
+          new Date(task.deadline).getTime() - now;
 
         if (remaining > 0 && remaining <= oneDay) {
           new Notification("Pengingat TaskFlow!", {
@@ -166,62 +309,78 @@ export default function Home() {
           notifiedTasks.current.add(task.id);
         }
       });
-    };
+    }
 
     checkDeadlines();
+
     const interval = window.setInterval(checkDeadlines, 60000);
 
     return () => window.clearInterval(interval);
-  }, [tasks]);
+  }, [tasks, sessionActive]);
 
-  async function enableNotifications() {
+  const enableNotifications = useCallback(async () => {
     if (!("Notification" in window)) {
-      setNotificationStatus("Browser tidak mendukung notifikasi.");
+      setNotificationStatus(
+        "Browser tidak mendukung notifikasi."
+      );
       return;
     }
 
     const permission = await Notification.requestPermission();
 
     if (permission === "granted") {
-      setNotificationStatus("Notifikasi berhasil diaktifkan!");
+      setNotificationStatus(
+        "Notifikasi berhasil diaktifkan!"
+      );
+
       new Notification("TaskFlow", {
         body: "Pengingat deadline sudah aktif.",
       });
     } else {
-      setNotificationStatus("Izin notifikasi belum diberikan.");
+      setNotificationStatus(
+        "Izin notifikasi belum diberikan."
+      );
     }
-  }
+  }, []);
 
-  function resetForm() {
+  // ==========================================
+  // RESET FORM
+  // ==========================================
+
+  const resetForm = useCallback(() => {
+    setEditId(null);
     setJudul("");
     setDeskripsi("");
     setDeadline("");
     setPrioritas("Sedang");
-    setEditId(null);
-  }
+  }, []);
 
-  // Tambah dan edit task
+  // ==========================================
+  // CREATE & UPDATE TASK
+  // ==========================================
+
   async function saveTask(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
     if (saving) return;
 
     setError("");
-
-    const cleanTitle = judul.trim();
-
-    if (!cleanTitle) {
-      setError("Judul task wajib diisi.");
-      return;
-    }
-
     setSaving(true);
 
     const values = {
-      judul: cleanTitle,
+      judul: judul.trim(),
       deskripsi: deskripsi.trim(),
-      deadline: deadline ? new Date(`${deadline}T12:00:00`).toISOString() : null,
+      deadline: deadline
+        ? new Date(deadline).toISOString()
+        : null,
       prioritas,
     };
+
+    if (!values.judul) {
+      setError("Judul task wajib diisi.");
+      setSaving(false);
+      return;
+    }
 
     let result;
 
@@ -230,12 +389,16 @@ export default function Home() {
         .from("project1")
         .insert([{ ...values, selesai: false }]);
     } else {
-      const task = tasks.find((item) => item.id === editId);
+      const taskToEdit = tasks.find(
+        (task) => task.id === editId
+      );
 
-      if (!task || task.selesai) {
-        setError("Task sudah selesai. Tekan Undo terlebih dahulu.");
-        setSaving(false);
+      if (!taskToEdit || taskToEdit.selesai) {
+        setError(
+          "Task sudah selesai. Tekan Undo terlebih dahulu untuk mengedit."
+        );
         resetForm();
+        setSaving(false);
         return;
       }
 
@@ -257,37 +420,58 @@ export default function Home() {
     setSaving(false);
   }
 
-  async function deleteTask(id: number) {
-    if (!window.confirm("Yakin ingin menghapus task ini?")) return;
+  // ==========================================
+  // DELETE TASK
+  // ==========================================
 
-    const { error } = await supabase
+  async function deleteTask(id: number) {
+    if (!window.confirm("Yakin ingin menghapus task ini?")) {
+      return;
+    }
+
+    const { error: deleteError } = await supabase
       .from("project1")
       .delete()
       .eq("id", id);
 
-    if (error) setError(error.message);
-    else await loadTasks();
+    if (deleteError) {
+      setError(deleteError.message);
+    } else {
+      await loadTasks();
+    }
   }
 
+  // ==========================================
+  // COMPLETE & UNDO
+  // ==========================================
+
   async function toggleTask(task: Task) {
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from("project1")
       .update({ selesai: !task.selesai })
       .eq("id", task.id);
 
-    if (error) {
-      setError(error.message);
+    if (updateError) {
+      setError(updateError.message);
       return;
     }
 
-    if (!task.selesai && editId === task.id) resetForm();
+    if (!task.selesai && editId === task.id) {
+      resetForm();
+    }
 
     await loadTasks();
   }
 
+  // ==========================================
+  // EDIT TASK
+  // ==========================================
+
   function editTask(task: Task) {
     if (task.selesai) {
-      setError("Task sudah selesai. Tekan Undo terlebih dahulu untuk mengedit.");
+      setError(
+        "Task sudah selesai. Tekan Undo terlebih dahulu untuk mengedit."
+      );
       return;
     }
 
@@ -296,123 +480,97 @@ export default function Home() {
     setJudul(task.judul);
     setDeskripsi(task.deskripsi ?? "");
     setDeadline(
-      task.deadline
-        ? new Date(task.deadline).toLocaleDateString("en-CA")
-        : ""
+      task.deadline ? task.deadline.slice(0, 10) : ""
     );
-    setPrioritas(task.prioritas ?? "Sedang");
+    setPrioritas(getPriority(task));
     setActivePage("Tasks");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
-  // Drag and drop untuk mengurutkan task
+  // ==========================================
+  // DRAG AND DROP
+  // ==========================================
+
   async function handleDrop(targetId: number) {
     if (
       draggedTaskId === null ||
       draggedTaskId === targetId ||
       savingOrder
-    ) return;
+    ) {
+      return;
+    }
 
-    const ordered = [...tasks].sort(
+    const orderedTasks = [...tasks].sort(
       (a, b) => a.urutan - b.urutan
     );
 
-    const from = ordered.findIndex((task) => task.id === draggedTaskId);
-    const to = ordered.findIndex((task) => task.id === targetId);
+    const fromIndex = orderedTasks.findIndex(
+      (task) => task.id === draggedTaskId
+    );
 
-    if (from < 0 || to < 0) {
+    const toIndex = orderedTasks.findIndex(
+      (task) => task.id === targetId
+    );
+
+    if (fromIndex === -1 || toIndex === -1) {
       setDraggedTaskId(null);
       return;
     }
 
-    const [moved] = ordered.splice(from, 1);
-    ordered.splice(to, 0, moved);
+    const [movedTask] = orderedTasks.splice(fromIndex, 1);
+    orderedTasks.splice(toIndex, 0, movedTask);
 
-    const updated = ordered.map((task, index) => ({
+    const updatedTasks = orderedTasks.map((task, index) => ({
       ...task,
       urutan: index + 1,
     }));
 
-    setTasks(updated);
+    setTasks(updatedTasks);
     setDraggedTaskId(null);
     setSavingOrder(true);
     setError("");
 
-    for (const task of updated) {
-      const { error } = await supabase
-        .from("project1")
-        .update({ urutan: task.urutan })
-        .eq("id", task.id);
+    try {
+      for (const task of updatedTasks) {
+        const { error: updateError } = await supabase
+          .from("project1")
+          .update({ urutan: task.urutan })
+          .eq("id", task.id);
 
-      if (error) {
-        setError("Gagal menyimpan urutan task: " + error.message);
-        await loadTasks();
-        setSavingOrder(false);
-        return;
+        if (updateError) {
+          throw updateError;
+        }
       }
-    }
 
-    await loadTasks();
-    setSavingOrder(false);
+      await loadTasks();
+    } catch (err) {
+      setError(
+        "Gagal menyimpan urutan task. " +
+        (err instanceof Error ? err.message : "")
+      );
+
+      await loadTasks();
+    } finally {
+      setSavingOrder(false);
+    }
   }
+
+  // ==========================================
+  // LOGOUT
+  // ==========================================
 
   async function handleLogout() {
     await supabase.auth.signOut();
     window.location.replace("/login");
   }
 
-  const completedTasks = useMemo(
-    () => tasks.filter((task) => task.selesai).length,
-    [tasks]
-  );
-
-  const pendingTasks = tasks.length - completedTasks;
-
-  const calendarDays = useMemo(() => {
-    const year = calendarDate.getFullYear();
-    const month = calendarDate.getMonth();
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    return {
-      firstDay,
-      days: Array.from({ length: daysInMonth }, (_, index) => index + 1),
-    };
-  }, [calendarDate]);
-
-  const calendarTasks = useMemo(() => {
-    const grouped: Record<number, Task[]> = {};
-
-    tasks.forEach((task) => {
-      if (!task.deadline) return;
-      const date = new Date(task.deadline);
-
-      if (
-        date.getMonth() !== calendarDate.getMonth() ||
-        date.getFullYear() !== calendarDate.getFullYear()
-      ) return;
-
-      const day = date.getDate();
-      if (!grouped[day]) grouped[day] = [];
-      grouped[day].push(task);
-    });
-
-    return grouped;
-  }, [tasks, calendarDate]);
-
-  const monthlyTasks = useMemo(
-    () =>
-      tasks.filter((task) => {
-        if (!task.deadline) return false;
-        const date = new Date(task.deadline);
-
-        return (
-          date.getMonth() === calendarDate.getMonth() &&
-          date.getFullYear() === calendarDate.getFullYear()
-        );
-      }),
-    [tasks, calendarDate]
-  );
+  // ==========================================
+  // CALENDAR NAVIGATION
+  // ==========================================
 
   function changeMonth(amount: number) {
     setCalendarDate(
@@ -424,71 +582,97 @@ export default function Home() {
     );
   }
 
-  function renderCalendar() {
-    return (
-      <section className="calendar-card">
-        <div className="calendar-header">
-          <button
-            type="button"
-            aria-label="Bulan sebelumnya"
-            onClick={() => changeMonth(-1)}
-          >
-            ←
-          </button>
+  // ==========================================
+  // CALENDAR COMPONENT
+  // ==========================================
 
-          <h2>
-            {monthNames[calendarDate.getMonth()]}{" "}
-            {calendarDate.getFullYear()}
-          </h2>
+  const renderCalendar = () => (
+    <div className="calendar-card">
+      <div className="calendar-header">
+        <button
+          type="button"
+          aria-label="Bulan sebelumnya"
+          onClick={() => changeMonth(-1)}
+        >
+          ←
+        </button>
 
-          <button
-            type="button"
-            aria-label="Bulan berikutnya"
-            onClick={() => changeMonth(1)}
-          >
-            →
-          </button>
-        </div>
+        <h2>
+          {calendarInfo.monthName} {calendarInfo.year}
+        </h2>
 
-        <div className="calendar-legend">
-          <span><i className="legend-high" /> Mendesak</span>
-          <span><i className="legend-medium" /> Normal</span>
-          <span><i className="legend-low" /> Tidak mendesak</span>
-          <span><i className="legend-done" /> Selesai</span>
-        </div>
+        <button
+          type="button"
+          aria-label="Bulan berikutnya"
+          onClick={() => changeMonth(1)}
+        >
+          →
+        </button>
+      </div>
 
-        <div className="calendar-grid">
-          {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map((day) => (
-            <strong key={day}>{day}</strong>
-          ))}
+      <div className="calendar-legend">
+        <span>
+          <i className="legend-high" /> Tinggi
+        </span>
+        <span>
+          <i className="legend-medium" /> Sedang
+        </span>
+        <span>
+          <i className="legend-low" /> Rendah
+        </span>
+        <span>
+          <i className="legend-done" /> Selesai
+        </span>
+      </div>
 
-          {Array.from({ length: calendarDays.firstDay }).map((_, index) => (
-            <div className="calendar-empty" key={`empty-${index}`} />
-          ))}
+      <div className="calendar-grid">
+        {WEEK_DAYS.map((day) => (
+          <strong key={day}>{day}</strong>
+        ))}
 
-          {calendarDays.days.map((day) => {
-            const dayTasks = calendarTasks[day] ?? [];
+        {Array.from(
+          { length: calendarInfo.firstDay },
+          (_, index) => (
+            <div
+              key={`empty-${index}`}
+              className="calendar-empty"
+            />
+          )
+        )}
+
+        {Array.from(
+          { length: calendarInfo.daysInMonth },
+          (_, index) => {
+            const day = index + 1;
+            const deadlineTasks = deadlineByDay.get(day) ?? [];
+
             const allCompleted =
-              dayTasks.length > 0 &&
-              dayTasks.every((task) => task.selesai);
+              deadlineTasks.length > 0 &&
+              deadlineTasks.every((task) => task.selesai);
 
             return (
               <div
                 key={day}
                 className={`calendar-day ${
-                  allCompleted ? "deadline-completed" : ""
-                } ${dayTasks.length ? "has-deadline" : ""}`}
+                  deadlineTasks.length
+                    ? allCompleted
+                      ? "deadline-completed"
+                      : "has-deadline"
+                    : ""
+                }`}
               >
-                <strong className="calendar-number">{day}</strong>
+                <strong className="calendar-number">
+                  {day}
+                </strong>
 
                 <div className="calendar-task-names">
-                  {dayTasks.map((task) => (
+                  {deadlineTasks.map((task) => (
                     <div
                       key={task.id}
                       className={`calendar-task-name ${
                         task.selesai
                           ? "task-name-completed"
-                          : `priority-${(task.prioritas ?? "Sedang").toLowerCase()}`
+                          : PRIORITY_CLASS[getPriority(task)]
                       }`}
                       title={task.judul}
                     >
@@ -498,57 +682,48 @@ export default function Home() {
                 </div>
               </div>
             );
-          })}
-        </div>
-
-        <h3 className="upcoming-title">Deadline Bulan Ini</h3>
-
-        {monthlyTasks.length === 0 ? (
-          <p className="empty-state">Belum ada deadline bulan ini.</p>
-        ) : (
-          monthlyTasks
-            .slice()
-            .sort(
-              (a, b) =>
-                new Date(a.deadline!).getTime() -
-                new Date(b.deadline!).getTime()
-            )
-            .map((task) => (
-              <div className="deadline-item" key={task.id}>
-                <div className="deadline-info">
-                  <strong>{task.judul}</strong>
-                  <p>
-                    {new Date(task.deadline!).toLocaleDateString("id-ID")}
-                  </p>
-                </div>
-
-                <span className={task.selesai ? "status-done" : "status-pending"}>
-                  {task.selesai ? "Selesai" : "Belum selesai"}
-                </span>
-              </div>
-            ))
+          }
         )}
-      </section>
-    );
-  }
+      </div>
 
-  function renderPriority(task: Task) {
-    const priority = task.prioritas ?? "Sedang";
+      <h3 className="upcoming-title">
+        Deadline Bulan Ini
+      </h3>
 
-    return (
-      <span className={`priority-badge priority-${priority.toLowerCase()}`}>
-        <span className="priority-dot" />
-        {priority} · {priorityText[priority]}
-      </span>
-    );
-  }
+      {monthlyTasks.length === 0 ? (
+        <p className="empty-state">
+          Belum ada deadline bulan ini.
+        </p>
+      ) : (
+        monthlyTasks.map((task) => (
+          <div className="deadline-item" key={task.id}>
+            <div className="deadline-info">
+              <strong>{task.judul}</strong>
+              <p>
+                {new Date(task.deadline!).toLocaleDateString(
+                  "id-ID"
+                )}
+              </p>
+              <TaskPriorityMemo task={task} />
+            </div>
+
+            <TaskStatusMemo completed={task.selesai} />
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  // ==========================================
+  // MAIN PAGE
+  // ==========================================
 
   return (
     <div className="app-layout">
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-icon">✓</span>
-          <span>TaskFlow</span>
+          TaskFlow
         </div>
 
         <p className="sidebar-label">MENU UTAMA</p>
@@ -560,8 +735,8 @@ export default function Home() {
             { name: "Calendar", icon: "▣" },
           ].map((item) => (
             <button
-              type="button"
               key={item.name}
+              type="button"
               className={`nav-item ${
                 activePage === item.name ? "active" : ""
               }`}
@@ -588,7 +763,7 @@ export default function Home() {
       <main className="main-content">
         <header className="topbar">
           <div>
-            <p className="eyebrow">WORKSPACE</p>
+            <p className="eyebrow">TASK MANAGEMENT</p>
             <h1>{activePage}</h1>
             <p className="topbar-description">
               Welcome to your TaskFlow workspace.
@@ -600,20 +775,23 @@ export default function Home() {
             className="notification-button"
             onClick={enableNotifications}
           >
-            <span>♧</span> Aktifkan Notifikasi
+            Aktifkan Notifikasi
           </button>
         </header>
 
         {notificationStatus && (
-          <p className="success-message">{notificationStatus}</p>
+          <p className="success-message">
+            {notificationStatus}
+          </p>
         )}
 
         {error && (
-          <div className="error-message" role="alert">
+          <p className="error-message">
             {error}
-          </div>
+          </p>
         )}
 
+        {/* DASHBOARD */}
         {activePage === "Dashboard" && (
           <>
             <div className="section-heading">
@@ -625,25 +803,102 @@ export default function Home() {
 
             <div className="stats-grid">
               <div className="stat-card stat-blue">
-                <span className="stat-icon">▤</span>
+                <div className="stat-icon">▦</div>
                 <p>Total Tasks</p>
                 <strong>{tasks.length}</strong>
               </div>
 
               <div className="stat-card stat-green">
-                <span className="stat-icon">✓</span>
+                <div className="stat-icon">✓</div>
                 <p>Completed</p>
                 <strong>{completedTasks}</strong>
               </div>
 
               <div className="stat-card stat-orange">
-                <span className="stat-icon">◷</span>
+                <div className="stat-icon">◷</div>
                 <p>In Progress</p>
                 <strong>{pendingTasks}</strong>
               </div>
             </div>
 
-            <section className="content-card">
+            <div className="content-card">
+              <div className="card-heading">
+                <div>
+                  <h2>Skala Prioritas</h2>
+                  <p>Jumlah tugas berdasarkan tingkat kepentingan.</p>
+                </div>
+              </div>
+
+              <div className="priority-overview">
+                <div className="priority-overview-item">
+                  <div className="priority-overview-heading">
+                    <span>
+                      <i className="priority-dot dot-tinggi" />
+                      Tinggi — Mendesak
+                    </span>
+                    <strong>{priorityCounts.tinggi}</strong>
+                  </div>
+                  <div className="priority-track">
+                    <div
+                      className="priority-fill priority-fill-high"
+                      style={{
+                        width: `${
+                          tasks.length
+                            ? (priorityCounts.tinggi / tasks.length) * 100
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="priority-overview-item">
+                  <div className="priority-overview-heading">
+                    <span>
+                      <i className="priority-dot dot-sedang" />
+                      Sedang — Normal
+                    </span>
+                    <strong>{priorityCounts.sedang}</strong>
+                  </div>
+                  <div className="priority-track">
+                    <div
+                      className="priority-fill priority-fill-medium"
+                      style={{
+                        width: `${
+                          tasks.length
+                            ? (priorityCounts.sedang / tasks.length) * 100
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="priority-overview-item">
+                  <div className="priority-overview-heading">
+                    <span>
+                      <i className="priority-dot dot-rendah" />
+                      Rendah — Tidak Mendesak
+                    </span>
+                    <strong>{priorityCounts.rendah}</strong>
+                  </div>
+                  <div className="priority-track">
+                    <div
+                      className="priority-fill priority-fill-low"
+                      style={{
+                        width: `${
+                          tasks.length
+                            ? (priorityCounts.rendah / tasks.length) * 100
+                            : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="content-card">
               <div className="card-heading">
                 <div>
                   <h2>Recent Tasks</h2>
@@ -655,43 +910,49 @@ export default function Home() {
                   className="text-button"
                   onClick={() => setActivePage("Tasks")}
                 >
-                  Lihat semua →
+                  Lihat semua
                 </button>
               </div>
 
               {loading ? (
-                <p className="empty-state">Memuat tugas...</p>
+                <p className="empty-state">Loading...</p>
               ) : tasks.length === 0 ? (
                 <p className="empty-state">
                   Belum ada task. Tambahkan task pertamamu!
                 </p>
               ) : (
                 tasks.slice(0, 5).map((task) => (
-                  <div className="task-row dashboard-task" key={task.id}>
+                  <div className="task-row" key={task.id}>
                     <div className="task-info">
-                      <strong className={task.selesai ? "task-completed" : ""}>
+                      <strong
+                        className={
+                          task.selesai ? "task-completed" : ""
+                        }
+                      >
                         {task.judul}
                       </strong>
-                      <p>{task.deskripsi || "Tidak ada deskripsi."}</p>
-                      {renderPriority(task)}
-                    </div>
 
-                    <span className={task.selesai ? "status-done" : "status-pending"}>
-                      {task.selesai ? "Completed" : "In Progress"}
-                    </span>
+                      <p>{task.deskripsi}</p>
+
+                      <div className="task-meta">
+                        <TaskPriorityMemo task={task} />
+                        <TaskStatusMemo completed={task.selesai} />
+                      </div>
+                    </div>
                   </div>
                 ))
               )}
-            </section>
+            </div>
           </>
         )}
 
+        {/* TASKS */}
         {activePage === "Tasks" && (
           <>
             <div className="section-heading">
               <div>
                 <h2>My Tasks</h2>
-                <p>Kelola dan atur prioritas semua tugasmu.</p>
+                <p>Kelola semua tugasmu di sini.</p>
               </div>
             </div>
 
@@ -699,31 +960,46 @@ export default function Home() {
               <div className="form-title">
                 <div className="form-title-icon">＋</div>
                 <div>
-                  <h3>{editId === null ? "Add New Task" : "Edit Task"}</h3>
-                  <p>Lengkapi informasi tugas di bawah ini.</p>
+                  <h3>
+                    {editId === null
+                      ? "Add New Task"
+                      : "Edit Task"}
+                  </h3>
+                  <p>
+                    Isi detail tugas dan tentukan prioritasnya.
+                  </p>
                 </div>
               </div>
 
-              <label htmlFor="task-title">Judul tugas</label>
-              <input
-                id="task-title"
-                placeholder="Contoh: Mengerjakan tugas matematika"
-                value={judul}
-                onChange={(e) => setJudul(e.target.value)}
-                required
-              />
+              <div className="form-field">
+                <label htmlFor="judul">Task Title</label>
+                <input
+                  id="judul"
+                  placeholder="Masukkan judul tugas..."
+                  value={judul}
+                  onChange={(e) => setJudul(e.target.value)}
+                  required
+                />
+              </div>
 
-              <label htmlFor="task-description">Deskripsi</label>
-              <textarea
-                id="task-description"
-                placeholder="Tambahkan detail tugas..."
-                value={deskripsi}
-                onChange={(e) => setDeskripsi(e.target.value)}
-              />
+              <div className="form-field">
+                <label htmlFor="deskripsi">
+                  Task Description
+                </label>
+                <textarea
+                  id="deskripsi"
+                  placeholder="Masukkan deskripsi tugas..."
+                  value={deskripsi}
+                  onChange={(e) => setDeskripsi(e.target.value)}
+                />
+              </div>
 
               <div className="form-two-columns">
                 <div className="form-field">
-                  <label htmlFor="prioritas">Skala prioritas</label>
+                  <label htmlFor="prioritas">
+                    Skala Prioritas
+                  </label>
+
                   <select
                     id="prioritas"
                     value={prioritas}
@@ -731,20 +1007,48 @@ export default function Home() {
                       setPrioritas(e.target.value as Priority)
                     }
                   >
-                    <option value="Tinggi">🔴 Tinggi — Mendesak</option>
-                    <option value="Sedang">🟠 Sedang — Normal</option>
-                    <option value="Rendah">🟢 Rendah — Tidak Mendesak</option>
+                    <option value="Tinggi">
+                      Tinggi — Mendesak
+                    </option>
+                    <option value="Sedang">
+                      Sedang — Normal
+                    </option>
+                    <option value="Rendah">
+                      Rendah — Tidak Mendesak
+                    </option>
                   </select>
                 </div>
 
                 <div className="form-field">
-                  <label htmlFor="task-deadline">Deadline</label>
+                  <label htmlFor="deadline">Deadline</label>
                   <input
-                    id="task-deadline"
+                    id="deadline"
                     type="date"
                     value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
+                    onChange={(e) =>
+                      setDeadline(e.target.value)
+                    }
                   />
+                </div>
+              </div>
+
+              <div className="priority-guide">
+                <div className="priority-guide-item">
+                  <i className="priority-dot dot-tinggi" />
+                  Tinggi
+                  <small>Mendesak</small>
+                </div>
+
+                <div className="priority-guide-item">
+                  <i className="priority-dot dot-sedang" />
+                  Sedang
+                  <small>Normal</small>
+                </div>
+
+                <div className="priority-guide-item">
+                  <i className="priority-dot dot-rendah" />
+                  Rendah
+                  <small>Tidak mendesak</small>
                 </div>
               </div>
 
@@ -757,8 +1061,8 @@ export default function Home() {
                   {saving
                     ? "Menyimpan..."
                     : editId === null
-                      ? "＋ Add Task"
-                      : "Simpan Perubahan"}
+                      ? "Add Task"
+                      : "Save Changes"}
                 </button>
 
                 {editId !== null && (
@@ -767,94 +1071,103 @@ export default function Home() {
                     type="button"
                     onClick={resetForm}
                   >
-                    Batal
+                    Cancel
                   </button>
                 )}
               </div>
             </form>
 
-            <section className="content-card">
+            <div className="content-card">
               <div className="card-heading">
                 <div>
                   <h2>All Tasks ({tasks.length})</h2>
-                  <p>Geser tugas untuk mengubah urutannya.</p>
+                  <p>
+                    Atur urutan tugas dengan drag-and-drop.
+                  </p>
                 </div>
               </div>
 
-              <div className="priority-guide">
-                {priorities.map((priority) => (
-                  <div className="priority-guide-item" key={priority}>
-                    <span className={`priority-dot dot-${priority.toLowerCase()}`} />
-                    <span>{priority}</span>
-                    <small>{priorityText[priority]}</small>
-                  </div>
-                ))}
-              </div>
-
               {savingOrder && (
-                <p className="saving-order">Menyimpan urutan tugas...</p>
+                <p className="saving-order">
+                  Menyimpan urutan task...
+                </p>
               )}
 
               {loading ? (
-                <p className="empty-state">Memuat tugas...</p>
+                <p className="empty-state">Loading...</p>
               ) : tasks.length === 0 ? (
                 <p className="empty-state">
                   Belum ada task. Tambahkan task pertamamu!
                 </p>
               ) : (
                 tasks.map((task) => (
-                  <article
-                    className={`task-row task-list-row ${
+                  <div
+                    className={`task-row ${
                       draggedTaskId === task.id ? "dragging" : ""
                     } ${task.selesai ? "completed-row" : ""}`}
                     key={task.id}
                     draggable={!savingOrder}
-                    onDragStart={() => setDraggedTaskId(task.id)}
+                    onDragStart={() =>
+                      setDraggedTaskId(task.id)
+                    }
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
                       e.preventDefault();
                       handleDrop(task.id);
                     }}
-                    onDragEnd={() => setDraggedTaskId(null)}
+                    onDragEnd={() =>
+                      setDraggedTaskId(null)
+                    }
                   >
-                    <div className="drag-handle" aria-label="Geser tugas">
+                    <div className="drag-handle" aria-hidden="true">
                       ⠿
                     </div>
 
                     <div className="task-info">
-                      <strong className={task.selesai ? "task-completed" : ""}>
+                      <strong
+                        className={
+                          task.selesai ? "task-completed" : ""
+                        }
+                      >
                         {task.judul}
                       </strong>
 
-                      <p>{task.deskripsi || "Tidak ada deskripsi."}</p>
+                      <p>{task.deskripsi}</p>
 
                       <div className="task-meta">
                         <span className="deadline-label">
-                          ◷{" "}
+                          Deadline:{" "}
                           {task.deadline
-                            ? new Date(task.deadline).toLocaleDateString("id-ID")
-                            : "Belum ada deadline"}
+                            ? new Date(
+                                task.deadline
+                              ).toLocaleDateString("id-ID")
+                            : "Belum ditentukan"}
                         </span>
-                        {renderPriority(task)}
-                        <span className={task.selesai ? "status-done" : "status-pending"}>
-                          {task.selesai ? "Completed" : "In Progress"}
-                        </span>
+
+                        <TaskPriorityMemo task={task} />
+                        <TaskStatusMemo completed={task.selesai} />
                       </div>
                     </div>
 
                     <div className="task-actions">
                       <button
                         type="button"
-                        className={task.selesai ? "undo-button" : "complete-button"}
+                        className={
+                          task.selesai
+                            ? "undo-button"
+                            : "complete-button"
+                        }
+                        draggable={false}
                         onClick={() => toggleTask(task)}
                       >
-                        {task.selesai ? "↶ Undo" : "✓ Complete"}
+                        {task.selesai ? "Undo" : "Complete"}
                       </button>
 
                       {!task.selesai && (
                         <button
                           type="button"
                           className="edit-button"
+                          draggable={false}
                           onClick={() => editTask(task)}
                         >
                           Edit
@@ -864,26 +1177,31 @@ export default function Home() {
                       <button
                         type="button"
                         className="delete-button"
+                        draggable={false}
                         onClick={() => deleteTask(task.id)}
                       >
-                        Hapus
+                        Delete
                       </button>
                     </div>
-                  </article>
+                  </div>
                 ))
               )}
-            </section>
+            </div>
           </>
         )}
 
+        {/* CALENDAR */}
         {activePage === "Calendar" && (
           <>
             <div className="section-heading">
               <div>
                 <h2>Calendar Deadline</h2>
-                <p>Lihat jadwal dan deadline semua tugasmu.</p>
+                <p>
+                  Lihat jadwal dan deadline semua task kamu.
+                </p>
               </div>
             </div>
+
             {renderCalendar()}
           </>
         )}

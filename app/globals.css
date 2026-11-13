@@ -1143,3 +1143,369 @@ button:disabled {
     animation-iteration-count: 1 !important;
   }
 }
+
+
+/* =====================================
+   TASKFLOW - PRIORITY UI & MOBILE FIX
+===================================== */
+
+.task-form select,
+.task-form input,
+.task-form textarea {
+  border: 1px solid #dbe5f5;
+  border-radius: 12px;
+  background: #f8faff;
+  color: #1e293b;
+  min-height: 46px;
+  padding: 12px 14px;
+  width: 100%;
+  outline: none;
+  transition: border-color .15s ease, background .15s ease;
+}
+
+.task-form select:focus,
+.task-form input:focus,
+.task-form textarea:focus {
+  border-color: #3b82f6;
+  background: #fff;
+}
+
+/* PRIORITY SELECT */
+#prioritas {
+  appearance: none;
+  -webkit-appearance: none;
+  font-weight: 700;
+  color: #1d4ed8;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+/* PRIORITY BADGE */
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 7px 11px;
+  margin: 8px 6px 0 0;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.priority-tinggi {
+  color: #1d4ed8 !important;
+  background: #dbeafe !important;
+  border: 1px solid #93c5fd !important;
+}
+
+.priority-sedang {
+  color: #1e40af !important;
+  background: #eff6ff !important;
+  border: 1px solid #bfdbfe !important;
+}
+
+.priority-rendah {
+  color: #475569 !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+/* TASK ROW */
+.task-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid #eaf0fa;
+  min-width: 0;
+}
+
+.task-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-info strong {
+  overflow-wrap: anywhere;
+}
+
+.task-info p {
+  overflow-wrap: anywhere;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.task-actions button {
+  border: 1px solid #dbe5f5;
+  background: #f8faff;
+  color: #1d4ed8;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.task-actions button:hover {
+  background: #eff6ff;
+}
+
+.task-actions .delete-button {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.task-completed {
+  color: #94a3b8 !important;
+  text-decoration: line-through;
+}
+
+.completed-row {
+  background: #f8fafc;
+}
+
+/* DRAG AND DROP */
+.task-row[draggable="true"] {
+  cursor: grab;
+}
+
+.task-row.dragging {
+  opacity: .45;
+  background: #eff6ff;
+}
+
+/* CALENDAR */
+.calendar-task-names {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.calendar-task-name {
+  font-size: 10px;
+  line-height: 1.35;
+  padding: 4px 5px;
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+
+.calendar-task-name.priority-tinggi {
+  background: #2563eb !important;
+  color: white !important;
+}
+
+.calendar-task-name.priority-sedang {
+  background: #60a5fa !important;
+  color: white !important;
+}
+
+.calendar-task-name.priority-rendah {
+  background: #94a3b8 !important;
+  color: white !important;
+}
+
+.calendar-task-name.task-name-completed {
+  background: #cbd5e1 !important;
+  color: #475569 !important;
+  text-decoration: line-through;
+}
+
+/* MOBILE */
+@media (max-width: 700px) {
+  .app-layout {
+    display: block;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .sidebar {
+    position: relative;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    padding: 12px;
+    border-right: 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .brand {
+    margin: 4px 6px 14px;
+    font-size: 21px;
+  }
+
+  .sidebar-label {
+    display: none;
+  }
+
+  .navigation {
+    display: flex;
+    overflow-x: auto;
+    gap: 6px;
+  }
+
+  .nav-item {
+    flex: 1;
+    justify-content: center;
+    white-space: nowrap;
+    padding: 10px 7px;
+    font-size: 12px;
+  }
+
+  .sidebar-bottom {
+    margin-top: 7px;
+  }
+
+  .main-content {
+    width: 100%;
+    min-width: 0;
+    padding: 20px 13px 35px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .topbar h1 {
+    font-size: 25px;
+  }
+
+  .notification-button {
+    width: 100%;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .stat-card {
+    min-width: 0;
+    padding: 13px 9px;
+  }
+
+  .stat-card strong {
+    font-size: 23px;
+  }
+
+  .stat-card span {
+    font-size: 11px;
+  }
+
+  .content-card,
+  .task-form,
+  .calendar-card {
+    padding: 15px;
+    min-width: 0;
+  }
+
+  .task-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .task-info {
+    width: 100%;
+  }
+
+  .task-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .task-actions button {
+    min-width: 0;
+    padding: 10px 5px;
+    font-size: 11px;
+  }
+
+  .priority-badge {
+    font-size: 11px;
+    padding: 6px 9px;
+  }
+
+  .form-actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .form-actions button {
+    flex: 1;
+  }
+
+  .calendar-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .calendar-day {
+    min-width: 0;
+    min-height: 58px;
+    padding: 4px 2px;
+  }
+
+  .calendar-task-name {
+    font-size: 8px;
+    padding: 3px 2px;
+  }
+
+  .calendar-header h2 {
+    font-size: 15px;
+  }
+
+  .deadline-item {
+    gap: 8px;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 380px) {
+  .main-content {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .stats-grid {
+    gap: 5px;
+  }
+
+  .stat-card {
+    padding: 11px 6px;
+  }
+
+  .stat-card strong {
+    font-size: 20px;
+  }
+
+  .task-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* PERFORMANCE: REDUCE UNNECESSARY ANIMATION */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
