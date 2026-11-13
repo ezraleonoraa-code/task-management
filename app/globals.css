@@ -1509,3 +1509,150 @@ button:disabled {
     scroll-behavior: auto !important;
   }
 }
+
+.form-field:has(#prioritas) {
+  position: relative;
+}
+
+.form-field:has(#prioritas) label {
+  display: block;
+  margin-bottom: 10px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+#prioritas {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 48px 0 16px;
+  border: 1.5px solid #dbeafe;
+  border-radius: 12px;
+  outline: none;
+  background-color: #f0f7ff;
+  color: #1e40af;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .2s ease;
+
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+}
+
+#prioritas:hover {
+  border-color: #93c5fd;
+  background-color: #eaf3ff;
+}
+
+#prioritas:focus {
+  border-color: #3b82f6;
+  background-color: #fff;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, .12);
+}
+
+/* PILIHAN PRIORITAS */
+#prioritas option {
+  padding: 12px;
+  background: #fff;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+/* PETUNJUK PRIORITAS */
+.priority-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.priority-guide-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.priority-guide-item small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.priority-guide-item:has(.dot-tinggi) {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.priority-guide-item:has(.dot-sedang) {
+  background: #f0f7ff;
+  border-color: #dbeafe;
+}
+
+.priority-guide-item:has(.dot-rendah) {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.priority-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.dot-tinggi {
+  background: #2563eb;
+}
+
+.dot-sedang {
+  background: #60a5fa;
+}
+
+.dot-rendah {
+  background: #94a3b8;
+}
+
+/* TAMPILAN HP */
+@media (max-width: 600px) {
+  #prioritas {
+    min-height: 48px;
+    font-size: 13px;
+  }
+
+  .priority-guide {
+    gap: 6px;
+  }
+
+  .priority-guide-item {
+    padding: 10px 8px;
+    font-size: 11px;
+  }
+
+  .priority-guide-item small {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  .priority-guide {
+    grid-template-columns: 1fr;
+  }
+
+  .priority-guide-item {
+    flex-direction: row;
+    align-items: center;
+  }
+}
