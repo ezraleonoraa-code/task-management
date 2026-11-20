@@ -473,6 +473,7 @@ export default function Home() {
       setError(
         "Task sudah selesai. Tekan Undo terlebih dahulu untuk mengedit."
       );
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
@@ -626,6 +627,10 @@ export default function Home() {
         </span>
       </div>
 
+      <p className="calendar-hint">
+        Klik nama task di kalender atau tombol Edit untuk mengubahnya.
+      </p>
+
       <div className="calendar-grid">
         {WEEK_DAYS.map((day) => (
           <strong key={day}>{day}</strong>
@@ -658,17 +663,23 @@ export default function Home() {
 
               <div className="calendar-task-names">
                 {deadlineTasks.map((task) => (
-                  <div
+                  <button
+                    type="button"
                     key={task.id}
                     className={`calendar-task-name ${
                       task.selesai
                         ? "task-name-completed"
                         : PRIORITY_CLASS[getPriority(task)]
                     }`}
-                    title={task.judul}
+                    title={
+                      task.selesai
+                        ? `${task.judul} (selesai)`
+                        : `Edit: ${task.judul}`
+                    }
+                    onClick={() => editTask(task)}
                   >
                     {task.judul}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -691,7 +702,19 @@ export default function Home() {
               <TaskPriorityMemo task={task} />
             </div>
 
-            <TaskStatusMemo completed={task.selesai} />
+            <div className="deadline-side">
+              <TaskStatusMemo completed={task.selesai} />
+
+              {!task.selesai && (
+                <button
+                  type="button"
+                  className="deadline-edit"
+                  onClick={() => editTask(task)}
+                >
+                  Edit
+                </button>
+              )}
+            </div>
           </div>
         ))
       )}
