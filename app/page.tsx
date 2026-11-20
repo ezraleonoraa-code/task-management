@@ -94,6 +94,7 @@ export default function Home() {
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const notifiedTasks = useRef<Set<number>>(new Set());
 
@@ -724,7 +725,22 @@ export default function Home() {
 
   return (
     <div className="app-layout">
-      <aside className="sidebar">
+      <button
+        type="button"
+        className="menu-toggle"
+        aria-label="Buka menu"
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen(true)}
+      >
+        ☰
+      </button>
+
+      <div
+        className={`sidebar-overlay ${menuOpen ? "show" : ""}`}
+        onClick={() => setMenuOpen(false)}
+      />
+
+      <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
         <div className="brand">
           <span className="brand-icon">✓</span>
           TaskFlow
@@ -744,7 +760,10 @@ export default function Home() {
               className={`nav-item ${
                 activePage === item.name ? "active" : ""
               }`}
-              onClick={() => setActivePage(item.name)}
+              onClick={() => {
+                setActivePage(item.name);
+                setMenuOpen(false);
+              }}
             >
               <span className="nav-icon">{item.icon}</span>
               {item.name}

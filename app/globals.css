@@ -166,6 +166,13 @@ a:focus-visible {
   color: #dc2626;
 }
 
+/* Tombol burger & latar gelap: hanya dipakai di HP */
+
+.menu-toggle,
+.sidebar-overlay {
+  display: none;
+}
+
 /* =====================================
    MAIN CONTENT & TOPBAR
 ===================================== */
@@ -1059,62 +1066,66 @@ a:focus-visible {
     overflow-x: hidden;
   }
 
-  .sidebar {
-    position: relative;
-    top: auto;
-    width: 100%;
-    height: auto;
-    min-height: 0;
-    padding: 12px 14px;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
+  /* Burger menu: sidebar jadi panel geser dari kiri */
 
-  .brand {
-    margin: 4px 6px 14px;
-    font-size: 21px;
-  }
-
-  .sidebar-label {
-    display: none;
-  }
-
-  .navigation {
+  .menu-toggle {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 40;
     display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    padding-bottom: 4px;
-  }
-
-  .nav-item {
-    width: auto;
-    min-width: 0;
-    flex: 1;
+    align-items: center;
     justify-content: center;
-    padding: 10px 8px;
-    gap: 7px;
-    font-size: 12px;
-    white-space: nowrap;
+    width: 44px;
+    height: 44px;
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    background: #fff;
+    color: var(--blue);
+    font-size: 22px;
+    box-shadow: 0 3px 12px rgba(15, 23, 42, 0.08);
   }
 
-  .nav-icon {
-    width: auto;
-    font-size: 16px;
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 60;
+    width: 260px;
+    max-width: 85vw;
+    height: 100vh;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0.25s ease;
   }
 
-  .sidebar-bottom {
-    margin-top: 6px;
+  .sidebar.open {
+    transform: none;
+    visibility: visible;
+    box-shadow: 0 0 30px rgba(15, 23, 42, 0.2);
   }
 
-  .sidebar-bottom .nav-item {
-    width: 100%;
-    justify-content: flex-start;
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(15, 23, 42, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .sidebar-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .main-content {
     width: 100%;
     min-width: 0;
-    padding: 20px 13px 35px;
+    padding: 72px 13px 35px;
   }
 
   .topbar {
@@ -1308,11 +1319,6 @@ a:focus-visible {
 
   .stat-card strong {
     font-size: 20px;
-  }
-
-  .nav-item {
-    font-size: 11px;
-    padding: 9px 6px;
   }
 
   .priority-badge {
