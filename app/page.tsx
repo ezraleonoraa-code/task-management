@@ -788,7 +788,7 @@ export default function Home() {
 
         return {
           key: `${year}-${month}-${index}`,
-          label: `W${index + 1}`,
+          label: `${startDay}-${endDay}`,
           title: `${startDay}-${endDay} ${MONTH_NAMES[month]} ${year}`,
           start: new Date(year, month, startDay).getTime(),
           end: new Date(year, month, endDay, 23, 59, 59, 999).getTime(),

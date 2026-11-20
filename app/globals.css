@@ -1074,7 +1074,7 @@ a:focus-visible {
 
 .gantt-grid {
   --gantt-name: 190px;
-  --gantt-week: 34px;
+  --gantt-week: 40px;
   display: grid;
 }
 
@@ -1482,7 +1482,7 @@ a:focus-visible {
 
   .gantt-grid {
     --gantt-name: 120px;
-    --gantt-week: 30px;
+    --gantt-week: 36px;
   }
 
   .gantt-corner {
