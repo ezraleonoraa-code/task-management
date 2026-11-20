@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* =====================================
+   VARIABEL WARNA
+   Ubah warna prioritas CUKUP di sini
+===================================== */
+
 :root {
   --blue: #2563eb;
   --blue-dark: #1d4ed8;
@@ -8,7 +13,29 @@
   --muted: #64748b;
   --border: #e2e8f0;
   --background: #f5f8ff;
+
+  /* Prioritas: Tinggi (Mendesak) */
+  --high: #dc2626;
+  --high-text: #b91c1c;
+  --high-bg: #fef2f2;
+  --high-border: #fecaca;
+
+  /* Prioritas: Sedang (Normal) */
+  --mid: #ea580c;
+  --mid-text: #c2410c;
+  --mid-bg: #fff7ed;
+  --mid-border: #fed7aa;
+
+  /* Prioritas: Rendah (Tidak Mendesak) */
+  --low: #16a34a;
+  --low-text: #15803d;
+  --low-bg: #f0fdf4;
+  --low-border: #bbf7d0;
 }
+
+/* =====================================
+   BASE
+===================================== */
 
 * {
   box-sizing: border-box;
@@ -41,16 +68,23 @@ button:disabled {
   cursor: not-allowed;
 }
 
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* =====================================
+   LAYOUT & SIDEBAR
+===================================== */
+
 .app-layout {
   display: flex;
   min-height: 100vh;
 }
 
-/* SIDEBAR */
-
 .sidebar {
   width: 245px;
-  min-height: 100vh;
   height: 100vh;
   position: sticky;
   top: 0;
@@ -132,7 +166,9 @@ button:disabled {
   color: #dc2626;
 }
 
-/* MAIN CONTENT */
+/* =====================================
+   MAIN CONTENT & TOPBAR
+===================================== */
 
 .main-content {
   flex: 1;
@@ -201,7 +237,9 @@ button:disabled {
   margin: 0 0 7px;
 }
 
-/* STATISTICS */
+/* =====================================
+   STATISTIK
+===================================== */
 
 .stats-grid {
   display: grid;
@@ -269,7 +307,9 @@ button:disabled {
   color: #ea580c;
 }
 
-/* CARDS */
+/* =====================================
+   KARTU
+===================================== */
 
 .content-card,
 .task-form,
@@ -311,7 +351,9 @@ button:disabled {
   color: var(--blue-dark);
 }
 
-/* TASK FORM */
+/* =====================================
+   FORM TASK
+===================================== */
 
 .task-form {
   display: grid;
@@ -348,6 +390,7 @@ button:disabled {
 }
 
 .task-form label {
+  display: block;
   font-size: 13px;
   font-weight: 700;
   color: #334155;
@@ -358,19 +401,22 @@ button:disabled {
 .task-form select {
   width: 100%;
   min-width: 0;
-  padding: 13px 14px;
-  border: 1px solid #cbd5e1;
-  border-radius: 9px;
-  background: #fff;
-  color: var(--text);
+  min-height: 46px;
+  padding: 12px 14px;
+  border: 1px solid #dbe5f5;
+  border-radius: 12px;
+  background-color: #f8faff;
+  color: #1e293b;
   outline: none;
-  transition: border 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .task-form input:focus,
 .task-form textarea:focus,
 .task-form select:focus {
-  border-color: var(--blue);
+  border-color: #3b82f6;
+  background-color: #fff;
   box-shadow: 0 0 0 3px #dbeafe;
 }
 
@@ -425,69 +471,213 @@ button:disabled {
   background: #f8fafc;
 }
 
-/* PRIORITY GUIDE */
+/* =====================================
+   SKALA PRIORITAS
+   Satu tempat untuk semua gaya prioritas
+===================================== */
 
-.priority-guide {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 13px;
-  background: #f8faff;
-  border: 1px solid #e8eef9;
-  border-radius: 11px;
-  margin-bottom: 8px;
+/* Tiap kelas prioritas hanya mengisi "warna"-nya.
+   Dipakai oleh badge, indikator, dan nama task di kalender. */
+
+.priority-tinggi {
+  --p: var(--high);
+  --p-text: var(--high-text);
+  --p-bg: var(--high-bg);
+  --p-border: var(--high-border);
 }
 
-.priority-guide-item {
-  display: flex;
+.priority-sedang {
+  --p: var(--mid);
+  --p-text: var(--mid-text);
+  --p-bg: var(--mid-bg);
+  --p-border: var(--mid-border);
+}
+
+.priority-rendah {
+  --p: var(--low);
+  --p-text: var(--low-text);
+  --p-bg: var(--low-bg);
+  --p-border: var(--low-border);
+}
+
+/* Badge prioritas di daftar task (bentuk pil, sama dengan status) */
+
+.priority-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 7px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--p-border);
+  background: var(--p-bg);
+  color: var(--p-text);
+  font-size: 11px;
   font-weight: 700;
+  line-height: 1.4;
+  white-space: normal;
 }
 
-.priority-guide-item small {
-  color: var(--muted);
-  font-weight: 400;
+.priority-indicator {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--p);
 }
+
+/* Titik warna (form, panduan, dashboard) */
 
 .priority-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 9px;
+  height: 9px;
   flex-shrink: 0;
+  border-radius: 50%;
 }
 
 .dot-tinggi,
-.priority-tinggi .priority-dot,
 .legend-high {
-  background: #dc2626;
+  background: var(--high);
 }
 
 .dot-sedang,
-.priority-sedang .priority-dot,
 .legend-medium {
-  background: #ea580c;
+  background: var(--mid);
 }
 
 .dot-rendah,
-.priority-rendah .priority-dot,
 .legend-low {
-  background: #16a34a;
+  background: var(--low);
 }
 
 .legend-done {
   background: #94a3b8;
 }
 
-/* TASK LIST */
+/* Dropdown: gaya dasar ikut .task-form select, di sini hanya panahnya */
+
+.form-field label[for="prioritas"] {
+  margin-bottom: 0;
+}
+
+.task-form select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 44px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+
+.task-form select:hover {
+  border-color: #bfdbfe;
+}
+
+.task-form select option {
+  background: #fff;
+  color: #1e293b;
+}
+
+/* Petunjuk prioritas di bawah form (sama dengan field form) */
+
+.priority-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 6px 0 8px;
+}
+
+.priority-guide-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 13px;
+  border: 1px solid #dbe5f5;
+  border-radius: 12px;
+  background: #f8faff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.priority-guide-item small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Dashboard: grafik batang skala prioritas */
+
+.priority-overview {
+  display: grid;
+  gap: 20px;
+}
+
+.priority-overview-item {
+  display: grid;
+  gap: 9px;
+}
+
+.priority-overview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.priority-overview-heading span {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.priority-overview-heading strong {
+  font-size: 18px;
+}
+
+.priority-track {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8eef9;
+}
+
+.priority-fill {
+  height: 100%;
+  min-width: 0;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.priority-fill-high {
+  background: var(--high);
+}
+
+.priority-fill-medium {
+  background: var(--mid);
+}
+
+.priority-fill-low {
+  background: var(--low);
+}
+
+/* =====================================
+   DAFTAR TASK
+===================================== */
 
 .task-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 15px;
+  gap: 16px;
   padding: 18px 0;
   border-bottom: 1px solid #edf1f7;
   min-width: 0;
@@ -495,6 +685,27 @@ button:disabled {
 
 .task-row:last-child {
   border-bottom: none;
+}
+
+.task-row[draggable="true"] {
+  cursor: grab;
+}
+
+.task-row.dragging {
+  opacity: 0.45;
+  background: #eff6ff;
+}
+
+.completed-row {
+  background: #fafcff;
+}
+
+.drag-handle {
+  color: #94a3b8;
+  font-size: 23px;
+  cursor: grab;
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .task-info {
@@ -534,37 +745,6 @@ button:disabled {
   font-size: 12px;
 }
 
-.priority-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  width: fit-content;
-  padding: 6px 10px;
-  border-radius: 7px;
-  font-size: 11px;
-  line-height: 1.3;
-  font-weight: 700;
-  white-space: normal;
-}
-
-.priority-tinggi {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-}
-
-.priority-sedang {
-  background: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #fed7aa;
-}
-
-.priority-rendah {
-  background: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
-}
-
 .status-done,
 .status-pending {
   display: inline-flex;
@@ -597,10 +777,10 @@ button:disabled {
 }
 
 .task-actions button {
-  padding: 8px 11px;
-  border: 1px solid #dbe3ef;
+  padding: 9px 12px;
+  border: 1px solid #dbe5f5;
   border-radius: 8px;
-  background: #fff;
+  background: #f8faff;
   color: #334155;
   font-size: 12px;
   font-weight: 700;
@@ -608,13 +788,17 @@ button:disabled {
 }
 
 .task-actions button:hover {
-  background: #f8fafc;
+  background: #eff6ff;
 }
 
 .task-actions .complete-button {
-  background: #eff6ff;
-  border-color: #d8ffd4;
-  color: #6dff86;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.task-actions .complete-button:hover {
+  background: #dcfce7;
 }
 
 .task-actions .undo-button {
@@ -630,31 +814,11 @@ button:disabled {
 .task-actions .delete-button {
   color: #dc2626;
   border-color: #fecaca;
+  background: #fff7f7;
 }
 
 .task-actions .delete-button:hover {
   background: #fef2f2;
-}
-
-.completed-row {
-  background: #fafcff;
-}
-
-.drag-handle {
-  color: #94a3b8;
-  font-size: 23px;
-  cursor: grab;
-  flex-shrink: 0;
-  user-select: none;
-}
-
-.task-list-row[draggable="true"] {
-  cursor: grab;
-}
-
-.task-list-row.dragging {
-  opacity: 0.4;
-  background: #eff6ff;
 }
 
 .saving-order {
@@ -662,7 +826,9 @@ button:disabled {
   font-size: 13px;
 }
 
-/* CALENDAR */
+/* =====================================
+   KALENDER
+===================================== */
 
 .calendar-card {
   margin-top: 22px;
@@ -689,7 +855,7 @@ button:disabled {
 .calendar-header button {
   border: none;
   background: #dbeafe;
-  color: #577fed;
+  color: #2563eb;
   font-size: 22px;
   width: 38px;
   height: 38px;
@@ -762,44 +928,35 @@ button:disabled {
   background: #eff6ff;
 }
 
-.calendar-task-names {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.calendar-task-name {
-  padding: 4px 5px;
-  border-radius: 5px;
-  font-size: 10px;
-  line-height: 1.3;
-  text-align: left;
-  overflow-wrap: anywhere;
-  color: white;
-}
-
-.calendar-task-name.priority-tinggi {
-  background: #dc2626;
-}
-
-.calendar-task-name.priority-sedang {
-  background: #ea580c;
-}
-
-.calendar-task-name.priority-rendah {
-  background: #16a34a;
-}
-
-.calendar-task-name.task-name-completed {
-  background: #94a3b8;
-  color: white;
-  text-decoration: line-through;
-}
-
 .calendar-day.deadline-completed {
   background: #f1f5f9;
   border-color: #cbd5e1;
   color: #64748b;
+}
+
+.calendar-task-names {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Nama task di kalender: warna solid sesuai prioritas */
+
+.calendar-task-name {
+  padding: 4px 5px;
+  border-radius: 5px;
+  background: var(--p, #94a3b8);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.35;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.calendar-task-name.task-name-completed {
+  background: #cbd5e1;
+  color: #475569;
+  text-decoration: line-through;
 }
 
 .upcoming-title {
@@ -828,13 +985,19 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.deadline-info .priority-badge {
+  margin-top: 8px;
+}
+
 .deadline-item p {
   color: var(--muted);
   font-size: 12px;
   margin: 6px 0 0;
 }
 
-/* MESSAGES */
+/* =====================================
+   PESAN
+===================================== */
 
 .empty-state {
   color: var(--muted);
@@ -859,10 +1022,13 @@ button:disabled {
   border: 1px solid #bbf7d0;
   border-radius: 9px;
   padding: 12px 14px;
+  margin-bottom: 18px;
   font-size: 13px;
 }
 
-/* TABLET */
+/* =====================================
+   TABLET
+===================================== */
 
 @media (max-width: 950px) {
   .sidebar {
@@ -882,11 +1048,15 @@ button:disabled {
   }
 }
 
-/* MOBILE */
+/* =====================================
+   HP
+===================================== */
 
 @media (max-width: 700px) {
   .app-layout {
     display: block;
+    width: 100%;
+    overflow-x: hidden;
   }
 
   .sidebar {
@@ -894,14 +1064,14 @@ button:disabled {
     top: auto;
     width: 100%;
     height: auto;
-    min-height: auto;
-    padding: 13px 14px;
+    min-height: 0;
+    padding: 12px 14px;
     border-right: none;
     border-bottom: 1px solid var(--border);
   }
 
   .brand {
-    margin: 2px 5px 13px;
+    margin: 4px 6px 14px;
     font-size: 21px;
   }
 
@@ -921,7 +1091,7 @@ button:disabled {
     min-width: 0;
     flex: 1;
     justify-content: center;
-    padding: 10px 9px;
+    padding: 10px 8px;
     gap: 7px;
     font-size: 12px;
     white-space: nowrap;
@@ -933,7 +1103,7 @@ button:disabled {
   }
 
   .sidebar-bottom {
-    margin-top: 5px;
+    margin-top: 6px;
   }
 
   .sidebar-bottom .nav-item {
@@ -943,14 +1113,15 @@ button:disabled {
 
   .main-content {
     width: 100%;
-    padding: 21px 14px 35px;
+    min-width: 0;
+    padding: 20px 13px 35px;
   }
 
   .topbar {
     align-items: flex-start;
     flex-direction: column;
-    gap: 15px;
-    margin-bottom: 25px;
+    gap: 14px;
+    margin-bottom: 24px;
   }
 
   .topbar h1 {
@@ -959,16 +1130,19 @@ button:disabled {
 
   .notification-button {
     width: 100%;
-    justify-content: center;
+  }
+
+  .section-heading h2 {
+    font-size: 20px;
   }
 
   .stats-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
   }
 
   .stat-card {
-    padding: 13px 10px;
+    min-width: 0;
+    padding: 13px 9px;
     border-radius: 11px;
   }
 
@@ -978,7 +1152,7 @@ button:disabled {
   }
 
   .stat-card strong {
-    font-size: 24px;
+    font-size: 23px;
   }
 
   .stat-icon {
@@ -990,22 +1164,41 @@ button:disabled {
   .content-card,
   .task-form,
   .calendar-card {
-    padding: 16px;
+    padding: 15px;
     border-radius: 12px;
-  }
-
-  .section-heading h2 {
-    font-size: 20px;
+    min-width: 0;
   }
 
   .form-two-columns {
     grid-template-columns: 1fr;
   }
 
+  .form-actions button {
+    flex: 1;
+  }
+
+  .priority-guide {
+    gap: 6px;
+  }
+
+  .priority-guide-item {
+    padding: 10px 8px;
+    font-size: 11px;
+  }
+
+  .priority-guide-item small {
+    font-size: 10px;
+  }
+
+  .priority-badge {
+    font-size: 11px;
+    padding: 6px 9px;
+  }
+
   .task-row {
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
   }
 
   .task-info {
@@ -1016,19 +1209,17 @@ button:disabled {
     width: 100%;
     max-width: none;
     justify-content: flex-start;
-    padding-left: 0;
+  }
+
+  .task-actions button {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 5px;
+    font-size: 11px;
   }
 
   .drag-handle {
     display: none;
-  }
-
-  .priority-guide {
-    gap: 9px;
-  }
-
-  .priority-guide-item {
-    font-size: 11px;
   }
 
   .calendar-card {
@@ -1045,8 +1236,8 @@ button:disabled {
   }
 
   .calendar-day {
-    min-height: 55px;
-    padding: 5px 2px;
+    min-height: 58px;
+    padding: 4px 2px;
     border-radius: 6px;
     gap: 3px;
   }
@@ -1084,6 +1275,7 @@ button:disabled {
   }
 
   .deadline-item {
+    gap: 8px;
     align-items: flex-start;
   }
 
@@ -1092,389 +1284,9 @@ button:disabled {
   }
 }
 
-/* HP KECIL */
-
-@media (max-width: 380px) {
-  .main-content {
-    padding-left: 10px;
-    padding-right: 10px;
-  }
-
-  .stats-grid {
-    gap: 5px;
-  }
-
-  .stat-card {
-    padding: 11px 7px;
-  }
-
-  .stat-card p {
-    font-size: 10px;
-  }
-
-  .stat-card strong {
-    font-size: 21px;
-  }
-
-  .nav-item {
-    font-size: 11px;
-    padding: 9px 6px;
-  }
-
-  .priority-badge {
-    font-size: 10px;
-    padding: 5px 7px;
-  }
-
-  .calendar-task-name {
-    font-size: 7px;
-  }
-}
-
-/* REDUCE ANIMATION FOR PERFORMANCE */
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-  }
-}
-
-
 /* =====================================
-   TASKFLOW - PRIORITY UI & MOBILE FIX
+   HP KECIL
 ===================================== */
-
-.task-form select,
-.task-form input,
-.task-form textarea {
-  border: 1px solid #dbe5f5;
-  border-radius: 12px;
-  background: #f8faff;
-  color: #1e293b;
-  min-height: 46px;
-  padding: 12px 14px;
-  width: 100%;
-  outline: none;
-  transition: border-color .15s ease, background .15s ease;
-}
-
-.task-form select:focus,
-.task-form input:focus,
-.task-form textarea:focus {
-  border-color: #3b82f6;
-  background: #fff;
-}
-
-/* PRIORITY SELECT */
-#prioritas {
-  appearance: none;
-  -webkit-appearance: none;
-  font-weight: 700;
-  color: #1d4ed8;
-  background-color: #eff6ff;
-  border: 1px solid #bfdbfe;
-}
-
-/* PRIORITY BADGE */
-.priority-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 7px 11px;
-  margin: 8px 6px 0 0;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.4;
-  white-space: normal;
-}
-
-.priority-tinggi {
-  color: #1d4ed8 !important;
-  background: #dbeafe !important;
-  border: 1px solid #93c5fd !important;
-}
-
-.priority-sedang {
-  color: #1e40af !important;
-  background: #eff6ff !important;
-  border: 1px solid #bfdbfe !important;
-}
-
-.priority-rendah {
-  color: #475569 !important;
-  background: #f1f5f9 !important;
-  border: 1px solid #cbd5e1 !important;
-}
-
-/* TASK ROW */
-.task-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 0;
-  border-bottom: 1px solid #eaf0fa;
-  min-width: 0;
-}
-
-.task-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.task-info strong {
-  overflow-wrap: anywhere;
-}
-
-.task-info p {
-  overflow-wrap: anywhere;
-  color: #64748b;
-  line-height: 1.5;
-}
-
-.task-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  flex-shrink: 0;
-}
-
-.task-actions button {
-  border: 1px solid #dbe5f5;
-  background: #f8faff;
-  color: #1d4ed8;
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.task-actions button:hover {
-  background: #eff6ff;
-}
-
-.task-actions .delete-button {
-  color: #dc2626;
-  border-color: #fecaca;
-  background: #fff7f7;
-}
-
-.task-completed {
-  color: #94a3b8 !important;
-  text-decoration: line-through;
-}
-
-.completed-row {
-  background: #f8fafc;
-}
-
-/* DRAG AND DROP */
-.task-row[draggable="true"] {
-  cursor: grab;
-}
-
-.task-row.dragging {
-  opacity: .45;
-  background: #eff6ff;
-}
-
-/* CALENDAR */
-.calendar-task-names {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.calendar-task-name {
-  font-size: 10px;
-  line-height: 1.35;
-  padding: 4px 5px;
-  border-radius: 5px;
-  overflow-wrap: anywhere;
-}
-
-.calendar-task-name.priority-tinggi {
-  background: #2563eb !important;
-  color: white !important;
-}
-
-.calendar-task-name.priority-sedang {
-  background: #60a5fa !important;
-  color: white !important;
-}
-
-.calendar-task-name.priority-rendah {
-  background: #94a3b8 !important;
-  color: white !important;
-}
-
-.calendar-task-name.task-name-completed {
-  background: #cbd5e1 !important;
-  color: #475569 !important;
-  text-decoration: line-through;
-}
-
-/* MOBILE */
-@media (max-width: 700px) {
-  .app-layout {
-    display: block;
-    width: 100%;
-    overflow-x: hidden;
-  }
-
-  .sidebar {
-    position: relative;
-    width: 100%;
-    height: auto;
-    min-height: 0;
-    padding: 12px;
-    border-right: 0;
-    border-bottom: 1px solid #e2e8f0;
-  }
-
-  .brand {
-    margin: 4px 6px 14px;
-    font-size: 21px;
-  }
-
-  .sidebar-label {
-    display: none;
-  }
-
-  .navigation {
-    display: flex;
-    overflow-x: auto;
-    gap: 6px;
-  }
-
-  .nav-item {
-    flex: 1;
-    justify-content: center;
-    white-space: nowrap;
-    padding: 10px 7px;
-    font-size: 12px;
-  }
-
-  .sidebar-bottom {
-    margin-top: 7px;
-  }
-
-  .main-content {
-    width: 100%;
-    min-width: 0;
-    padding: 20px 13px 35px;
-  }
-
-  .topbar {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 14px;
-    margin-bottom: 24px;
-  }
-
-  .topbar h1 {
-    font-size: 25px;
-  }
-
-  .notification-button {
-    width: 100%;
-  }
-
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .stat-card {
-    min-width: 0;
-    padding: 13px 9px;
-  }
-
-  .stat-card strong {
-    font-size: 23px;
-  }
-
-  .stat-card span {
-    font-size: 11px;
-  }
-
-  .content-card,
-  .task-form,
-  .calendar-card {
-    padding: 15px;
-    min-width: 0;
-  }
-
-  .task-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .task-info {
-    width: 100%;
-  }
-
-  .task-actions {
-    width: 100%;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .task-actions button {
-    min-width: 0;
-    padding: 10px 5px;
-    font-size: 11px;
-  }
-
-  .priority-badge {
-    font-size: 11px;
-    padding: 6px 9px;
-  }
-
-  .form-actions {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  .form-actions button {
-    flex: 1;
-  }
-
-  .calendar-grid {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 3px;
-  }
-
-  .calendar-day {
-    min-width: 0;
-    min-height: 58px;
-    padding: 4px 2px;
-  }
-
-  .calendar-task-name {
-    font-size: 8px;
-    padding: 3px 2px;
-  }
-
-  .calendar-header h2 {
-    font-size: 15px;
-  }
-
-  .deadline-item {
-    gap: 8px;
-    align-items: flex-start;
-  }
-}
 
 @media (max-width: 380px) {
   .main-content {
@@ -1490,163 +1302,28 @@ button:disabled {
     padding: 11px 6px;
   }
 
+  .stat-card p {
+    font-size: 10px;
+  }
+
   .stat-card strong {
     font-size: 20px;
   }
 
-  .task-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-/* PERFORMANCE: REDUCE UNNECESSARY ANIMATION */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-.form-field:has(#prioritas) {
-  position: relative;
-}
-
-.form-field:has(#prioritas) label {
-  display: block;
-  margin-bottom: 10px;
-  color: #334155;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-#prioritas {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 100%;
-  min-height: 52px;
-  padding: 0 48px 0 16px;
-  border: 1.5px solid #dbeafe;
-  border-radius: 12px;
-  outline: none;
-  background-color: #f0f7ff;
-  color: #1e40af;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all .2s ease;
-
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 16px center;
-}
-
-#prioritas:hover {
-  border-color: #93c5fd;
-  background-color: #eaf3ff;
-}
-
-#prioritas:focus {
-  border-color: #3b82f6;
-  background-color: #fff;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, .12);
-}
-
-/* PILIHAN PRIORITAS */
-#prioritas option {
-  padding: 12px;
-  background: #fff;
-  color: #1e293b;
-  font-weight: 600;
-}
-
-/* PETUNJUK PRIORITAS */
-.priority-guide {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.priority-guide-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 13px;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #fff;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.priority-guide-item small {
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.priority-guide-item:has(.dot-tinggi) {
-  background: #eff6ff;
-  border-color: #bfdbfe;
-}
-
-.priority-guide-item:has(.dot-sedang) {
-  background: #f0f7ff;
-  border-color: #dbeafe;
-}
-
-.priority-guide-item:has(.dot-rendah) {
-  background: #f8fafc;
-  border-color: #e2e8f0;
-}
-
-.priority-dot {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  flex-shrink: 0;
-  border-radius: 50%;
-}
-
-.dot-tinggi {
-  background: #2563eb;
-}
-
-.dot-sedang {
-  background: #60a5fa;
-}
-
-.dot-rendah {
-  background: #94a3b8;
-}
-
-/* TAMPILAN HP */
-@media (max-width: 600px) {
-  #prioritas {
-    min-height: 48px;
-    font-size: 13px;
-  }
-
-  .priority-guide {
-    gap: 6px;
-  }
-
-  .priority-guide-item {
-    padding: 10px 8px;
+  .nav-item {
     font-size: 11px;
+    padding: 9px 6px;
   }
 
-  .priority-guide-item small {
+  .priority-badge {
     font-size: 10px;
+    padding: 5px 7px;
   }
-}
 
-@media (max-width: 360px) {
+  .calendar-task-name {
+    font-size: 7px;
+  }
+
   .priority-guide {
     grid-template-columns: 1fr;
   }
@@ -1654,5 +1331,19 @@ button:disabled {
   .priority-guide-item {
     flex-direction: row;
     align-items: center;
+  }
+}
+
+/* =====================================
+   KURANGI ANIMASI (PERFORMA & AKSESIBILITAS)
+===================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
   }
 }

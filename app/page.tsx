@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -46,10 +45,7 @@ const PRIORITY_CLASS: Record<Priority, string> = {
 };
 
 function getPriority(task: Task): Priority {
-  if (
-    task.prioritas === "Tinggi" ||
-    task.prioritas === "Rendah"
-  ) {
+  if (task.prioritas === "Tinggi" || task.prioritas === "Rendah") {
     return task.prioritas;
   }
 
@@ -163,20 +159,22 @@ export default function Home() {
 
   const pendingTasks = tasks.length - completedTasks;
 
-  const priorityCounts = useMemo(
-    () => ({
-      tinggi: tasks.filter(
-        (task) => !task.selesai && getPriority(task) === "Tinggi"
-      ).length,
-      sedang: tasks.filter(
-        (task) => !task.selesai && getPriority(task) === "Sedang"
-      ).length,
-      rendah: tasks.filter(
-        (task) => !task.selesai && getPriority(task) === "Rendah"
-      ).length,
-    }),
-    [tasks]
-  );
+  // Dihitung dalam SATU putaran saja (sebelumnya 3 kali filter)
+  const priorityCounts = useMemo(() => {
+    const counts = { tinggi: 0, sedang: 0, rendah: 0 };
+
+    for (const task of tasks) {
+      if (task.selesai) continue;
+
+      const priority = getPriority(task);
+
+      if (priority === "Tinggi") counts.tinggi++;
+      else if (priority === "Sedang") counts.sedang++;
+      else counts.rendah++;
+    }
+
+    return counts;
+  }, [tasks]);
 
   // ==========================================
   // LOAD TASKS
@@ -201,14 +199,17 @@ export default function Home() {
 
   // ==========================================
   // AUTHENTICATION
+  // Cek login & ambil data BERSAMAAN (tidak antre)
   // ==========================================
 
   useEffect(() => {
     let mounted = true;
 
-    async function checkLogin() {
-      const { data, error: authError } =
-        await supabase.auth.getSession();
+    async function start() {
+      const [{ data, error: authError }] = await Promise.all([
+        supabase.auth.getSession(),
+        loadTasks(),
+      ]);
 
       if (!mounted) return;
 
@@ -218,10 +219,9 @@ export default function Home() {
       }
 
       setSessionActive(true);
-      await loadTasks();
     }
 
-    checkLogin();
+    start();
 
     const {
       data: { subscription },
@@ -258,12 +258,7 @@ export default function Home() {
       }, INACTIVITY_LIMIT);
     };
 
-    const events = [
-      "pointerdown",
-      "keydown",
-      "scroll",
-      "touchstart",
-    ];
+    const events = ["pointerdown", "keydown", "scroll", "touchstart"];
 
     events.forEach((event) => {
       window.addEventListener(event, resetTimer, { passive: true });
@@ -298,8 +293,7 @@ export default function Home() {
         if (!task.deadline || task.selesai) return;
         if (notifiedTasks.current.has(task.id)) return;
 
-        const remaining =
-          new Date(task.deadline).getTime() - now;
+        const remaining = new Date(task.deadline).getTime() - now;
 
         if (remaining > 0 && remaining <= oneDay) {
           new Notification("Pengingat TaskFlow!", {
@@ -320,26 +314,20 @@ export default function Home() {
 
   const enableNotifications = useCallback(async () => {
     if (!("Notification" in window)) {
-      setNotificationStatus(
-        "Browser tidak mendukung notifikasi."
-      );
+      setNotificationStatus("Browser tidak mendukung notifikasi.");
       return;
     }
 
     const permission = await Notification.requestPermission();
 
     if (permission === "granted") {
-      setNotificationStatus(
-        "Notifikasi berhasil diaktifkan!"
-      );
+      setNotificationStatus("Notifikasi berhasil diaktifkan!");
 
       new Notification("TaskFlow", {
         body: "Pengingat deadline sudah aktif.",
       });
     } else {
-      setNotificationStatus(
-        "Izin notifikasi belum diberikan."
-      );
+      setNotificationStatus("Izin notifikasi belum diberikan.");
     }
   }, []);
 
@@ -370,9 +358,7 @@ export default function Home() {
     const values = {
       judul: judul.trim(),
       deskripsi: deskripsi.trim(),
-      deadline: deadline
-        ? new Date(deadline).toISOString()
-        : null,
+      deadline: deadline ? new Date(deadline).toISOString() : null,
       prioritas,
     };
 
@@ -389,9 +375,7 @@ export default function Home() {
         .from("project1")
         .insert([{ ...values, selesai: false }]);
     } else {
-      const taskToEdit = tasks.find(
-        (task) => task.id === editId
-      );
+      const taskToEdit = tasks.find((task) => task.id === editId);
 
       if (!taskToEdit || taskToEdit.selesai) {
         setError(
@@ -416,12 +400,13 @@ export default function Home() {
     }
 
     resetForm();
-    await loadTasks();
+    await loadTasks(); // di sini memang perlu, karena id task baru dibuat server
     setSaving(false);
   }
 
   // ==========================================
   // DELETE TASK
+  // Tidak ambil ulang semua data, cukup buang 1 task dari layar
   // ==========================================
 
   async function deleteTask(id: number) {
@@ -436,13 +421,19 @@ export default function Home() {
 
     if (deleteError) {
       setError(deleteError.message);
-    } else {
-      await loadTasks();
+      return;
+    }
+
+    setTasks((prev) => prev.filter((task) => task.id !== id));
+
+    if (editId === id) {
+      resetForm();
     }
   }
 
   // ==========================================
   // COMPLETE & UNDO
+  // Tidak ambil ulang semua data, cukup ubah 1 task di layar
   // ==========================================
 
   async function toggleTask(task: Task) {
@@ -456,11 +447,15 @@ export default function Home() {
       return;
     }
 
+    setTasks((prev) =>
+      prev.map((item) =>
+        item.id === task.id ? { ...item, selesai: !item.selesai } : item
+      )
+    );
+
     if (!task.selesai && editId === task.id) {
       resetForm();
     }
-
-    await loadTasks();
   }
 
   // ==========================================
@@ -479,9 +474,7 @@ export default function Home() {
     setEditId(task.id);
     setJudul(task.judul);
     setDeskripsi(task.deskripsi ?? "");
-    setDeadline(
-      task.deadline ? task.deadline.slice(0, 10) : ""
-    );
+    setDeadline(task.deadline ? task.deadline.slice(0, 10) : "");
     setPrioritas(getPriority(task));
     setActivePage("Tasks");
 
@@ -493,6 +486,7 @@ export default function Home() {
 
   // ==========================================
   // DRAG AND DROP
+  // Simpan urutan dalam SATU kiriman (upsert), bukan satu-satu
   // ==========================================
 
   async function handleDrop(targetId: number) {
@@ -504,17 +498,13 @@ export default function Home() {
       return;
     }
 
-    const orderedTasks = [...tasks].sort(
-      (a, b) => a.urutan - b.urutan
-    );
+    const orderedTasks = [...tasks].sort((a, b) => a.urutan - b.urutan);
 
     const fromIndex = orderedTasks.findIndex(
       (task) => task.id === draggedTaskId
     );
 
-    const toIndex = orderedTasks.findIndex(
-      (task) => task.id === targetId
-    );
+    const toIndex = orderedTasks.findIndex((task) => task.id === targetId);
 
     if (fromIndex === -1 || toIndex === -1) {
       setDraggedTaskId(null);
@@ -535,25 +525,30 @@ export default function Home() {
     setError("");
 
     try {
-      for (const task of updatedTasks) {
-        const { error: updateError } = await supabase
-          .from("project1")
-          .update({ urutan: task.urutan })
-          .eq("id", task.id);
+      const { error: orderError } = await supabase.from("project1").upsert(
+        updatedTasks.map((task) => ({
+          id: task.id,
+          judul: task.judul,
+          deskripsi: task.deskripsi,
+          deadline: task.deadline,
+          selesai: task.selesai,
+          prioritas: task.prioritas,
+          urutan: task.urutan,
+        })),
+        { onConflict: "id" }
+      );
 
-        if (updateError) {
-          throw updateError;
-        }
+      if (orderError) {
+        throw orderError;
       }
-
-      await loadTasks();
+      // Berhasil: layar sudah benar, tidak perlu loadTasks() lagi
     } catch (err) {
       setError(
         "Gagal menyimpan urutan task. " +
-        (err instanceof Error ? err.message : "")
+          (err instanceof Error ? err.message : "")
       );
 
-      await loadTasks();
+      await loadTasks(); // kembalikan ke urutan asli kalau gagal
     } finally {
       setSavingOrder(false);
     }
@@ -630,79 +625,62 @@ export default function Home() {
           <strong key={day}>{day}</strong>
         ))}
 
-        {Array.from(
-          { length: calendarInfo.firstDay },
-          (_, index) => (
+        {Array.from({ length: calendarInfo.firstDay }, (_, index) => (
+          <div key={`empty-${index}`} className="calendar-empty" />
+        ))}
+
+        {Array.from({ length: calendarInfo.daysInMonth }, (_, index) => {
+          const day = index + 1;
+          const deadlineTasks = deadlineByDay.get(day) ?? [];
+
+          const allCompleted =
+            deadlineTasks.length > 0 &&
+            deadlineTasks.every((task) => task.selesai);
+
+          return (
             <div
-              key={`empty-${index}`}
-              className="calendar-empty"
-            />
-          )
-        )}
+              key={day}
+              className={`calendar-day ${
+                deadlineTasks.length
+                  ? allCompleted
+                    ? "deadline-completed"
+                    : "has-deadline"
+                  : ""
+              }`}
+            >
+              <strong className="calendar-number">{day}</strong>
 
-        {Array.from(
-          { length: calendarInfo.daysInMonth },
-          (_, index) => {
-            const day = index + 1;
-            const deadlineTasks = deadlineByDay.get(day) ?? [];
-
-            const allCompleted =
-              deadlineTasks.length > 0 &&
-              deadlineTasks.every((task) => task.selesai);
-
-            return (
-              <div
-                key={day}
-                className={`calendar-day ${
-                  deadlineTasks.length
-                    ? allCompleted
-                      ? "deadline-completed"
-                      : "has-deadline"
-                    : ""
-                }`}
-              >
-                <strong className="calendar-number">
-                  {day}
-                </strong>
-
-                <div className="calendar-task-names">
-                  {deadlineTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className={`calendar-task-name ${
-                        task.selesai
-                          ? "task-name-completed"
-                          : PRIORITY_CLASS[getPriority(task)]
-                      }`}
-                      title={task.judul}
-                    >
-                      {task.judul}
-                    </div>
-                  ))}
-                </div>
+              <div className="calendar-task-names">
+                {deadlineTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className={`calendar-task-name ${
+                      task.selesai
+                        ? "task-name-completed"
+                        : PRIORITY_CLASS[getPriority(task)]
+                    }`}
+                    title={task.judul}
+                  >
+                    {task.judul}
+                  </div>
+                ))}
               </div>
-            );
-          }
-        )}
+            </div>
+          );
+        })}
       </div>
 
-      <h3 className="upcoming-title">
-        Deadline Bulan Ini
-      </h3>
+      <h3 className="upcoming-title">Deadline Bulan Ini</h3>
 
       {monthlyTasks.length === 0 ? (
-        <p className="empty-state">
-          Belum ada deadline bulan ini.
-        </p>
+        <p className="empty-state">Belum ada deadline bulan ini.</p>
       ) : (
         monthlyTasks.map((task) => (
           <div className="deadline-item" key={task.id}>
             <div className="deadline-info">
               <strong>{task.judul}</strong>
               <p>
-                {new Date(task.deadline!).toLocaleDateString(
-                  "id-ID"
-                )}
+                {new Date(task.deadline!).toLocaleDateString("id-ID")}
               </p>
               <TaskPriorityMemo task={task} />
             </div>
@@ -713,6 +691,27 @@ export default function Home() {
       )}
     </div>
   );
+
+  // ==========================================
+  // LAYAR "MEMUAT" (muncul cepat, selagi cek login)
+  // Harus setelah SEMUA hook, supaya aturan hooks aman
+  // ==========================================
+
+  if (!sessionActive) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "sans-serif",
+        }}
+      >
+        <p>Memuat TaskFlow...</p>
+      </div>
+    );
+  }
 
   // ==========================================
   // MAIN PAGE
@@ -780,16 +779,10 @@ export default function Home() {
         </header>
 
         {notificationStatus && (
-          <p className="success-message">
-            {notificationStatus}
-          </p>
+          <p className="success-message">{notificationStatus}</p>
         )}
 
-        {error && (
-          <p className="error-message">
-            {error}
-          </p>
-        )}
+        {error && <p className="error-message">{error}</p>}
 
         {/* DASHBOARD */}
         {activePage === "Dashboard" && (
@@ -925,9 +918,7 @@ export default function Home() {
                   <div className="task-row" key={task.id}>
                     <div className="task-info">
                       <strong
-                        className={
-                          task.selesai ? "task-completed" : ""
-                        }
+                        className={task.selesai ? "task-completed" : ""}
                       >
                         {task.judul}
                       </strong>
@@ -960,14 +951,8 @@ export default function Home() {
               <div className="form-title">
                 <div className="form-title-icon">＋</div>
                 <div>
-                  <h3>
-                    {editId === null
-                      ? "Add New Task"
-                      : "Edit Task"}
-                  </h3>
-                  <p>
-                    Isi detail tugas dan tentukan prioritasnya.
-                  </p>
+                  <h3>{editId === null ? "Add New Task" : "Edit Task"}</h3>
+                  <p>Isi detail tugas dan tentukan prioritasnya.</p>
                 </div>
               </div>
 
@@ -983,9 +968,7 @@ export default function Home() {
               </div>
 
               <div className="form-field">
-                <label htmlFor="deskripsi">
-                  Task Description
-                </label>
+                <label htmlFor="deskripsi">Task Description</label>
                 <textarea
                   id="deskripsi"
                   placeholder="Masukkan deskripsi tugas..."
@@ -996,9 +979,7 @@ export default function Home() {
 
               <div className="form-two-columns">
                 <div className="form-field">
-                  <label htmlFor="prioritas">
-                    Skala Prioritas
-                  </label>
+                  <label htmlFor="prioritas">Skala Prioritas</label>
 
                   <select
                     id="prioritas"
@@ -1007,15 +988,9 @@ export default function Home() {
                       setPrioritas(e.target.value as Priority)
                     }
                   >
-                    <option value="Tinggi">
-                      Tinggi — Mendesak
-                    </option>
-                    <option value="Sedang">
-                      Sedang — Normal
-                    </option>
-                    <option value="Rendah">
-                      Rendah — Tidak Mendesak
-                    </option>
+                    <option value="Tinggi">Tinggi — Mendesak</option>
+                    <option value="Sedang">Sedang — Normal</option>
+                    <option value="Rendah">Rendah — Tidak Mendesak</option>
                   </select>
                 </div>
 
@@ -1025,9 +1000,7 @@ export default function Home() {
                     id="deadline"
                     type="date"
                     value={deadline}
-                    onChange={(e) =>
-                      setDeadline(e.target.value)
-                    }
+                    onChange={(e) => setDeadline(e.target.value)}
                   />
                 </div>
               </div>
@@ -1081,16 +1054,12 @@ export default function Home() {
               <div className="card-heading">
                 <div>
                   <h2>All Tasks ({tasks.length})</h2>
-                  <p>
-                    Atur urutan tugas dengan drag-and-drop.
-                  </p>
+                  <p>Atur urutan tugas dengan drag-and-drop.</p>
                 </div>
               </div>
 
               {savingOrder && (
-                <p className="saving-order">
-                  Menyimpan urutan task...
-                </p>
+                <p className="saving-order">Menyimpan urutan task...</p>
               )}
 
               {loading ? (
@@ -1107,17 +1076,13 @@ export default function Home() {
                     } ${task.selesai ? "completed-row" : ""}`}
                     key={task.id}
                     draggable={!savingOrder}
-                    onDragStart={() =>
-                      setDraggedTaskId(task.id)
-                    }
+                    onDragStart={() => setDraggedTaskId(task.id)}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
                       e.preventDefault();
                       handleDrop(task.id);
                     }}
-                    onDragEnd={() =>
-                      setDraggedTaskId(null)
-                    }
+                    onDragEnd={() => setDraggedTaskId(null)}
                   >
                     <div className="drag-handle" aria-hidden="true">
                       ⠿
@@ -1125,9 +1090,7 @@ export default function Home() {
 
                     <div className="task-info">
                       <strong
-                        className={
-                          task.selesai ? "task-completed" : ""
-                        }
+                        className={task.selesai ? "task-completed" : ""}
                       >
                         {task.judul}
                       </strong>
@@ -1138,9 +1101,9 @@ export default function Home() {
                         <span className="deadline-label">
                           Deadline:{" "}
                           {task.deadline
-                            ? new Date(
-                                task.deadline
-                              ).toLocaleDateString("id-ID")
+                            ? new Date(task.deadline).toLocaleDateString(
+                                "id-ID"
+                              )
                             : "Belum ditentukan"}
                         </span>
 
@@ -1153,9 +1116,7 @@ export default function Home() {
                       <button
                         type="button"
                         className={
-                          task.selesai
-                            ? "undo-button"
-                            : "complete-button"
+                          task.selesai ? "undo-button" : "complete-button"
                         }
                         draggable={false}
                         onClick={() => toggleTask(task)}
@@ -1196,9 +1157,7 @@ export default function Home() {
             <div className="section-heading">
               <div>
                 <h2>Calendar Deadline</h2>
-                <p>
-                  Lihat jadwal dan deadline semua task kamu.
-                </p>
+                <p>Lihat jadwal dan deadline semua task kamu.</p>
               </div>
             </div>
 
@@ -1209,4 +1168,3 @@ export default function Home() {
     </div>
   );
 }
-
