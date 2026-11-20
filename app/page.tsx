@@ -92,6 +92,7 @@ export default function Home() {
   const [calendarDate, setCalendarDate] = useState(new Date(2026, 0, 1));
 
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -492,73 +493,95 @@ export default function Home() {
   }
 
   // ==========================================
-  // DRAG AND DROP
-  // Simpan urutan dalam SATU kiriman (upsert), bukan satu-satu
+  // URUTAN TASK (DRAG AND DROP + TOMBOL ▲▼)
+  // Hanya task yang urutannya berubah yang dikirim ke database
   // ==========================================
 
-  async function handleDrop(targetId: number) {
-    if (
-      draggedTaskId === null ||
-      draggedTaskId === targetId ||
-      savingOrder
-    ) {
-      return;
-    }
+  async function persistOrder(newOrder: Task[]) {
+    const previous = tasks;
 
-    const orderedTasks = [...tasks].sort((a, b) => a.urutan - b.urutan);
-
-    const fromIndex = orderedTasks.findIndex(
-      (task) => task.id === draggedTaskId
-    );
-
-    const toIndex = orderedTasks.findIndex((task) => task.id === targetId);
-
-    if (fromIndex === -1 || toIndex === -1) {
-      setDraggedTaskId(null);
-      return;
-    }
-
-    const [movedTask] = orderedTasks.splice(fromIndex, 1);
-    orderedTasks.splice(toIndex, 0, movedTask);
-
-    const updatedTasks = orderedTasks.map((task, index) => ({
+    const updated = newOrder.map((task, index) => ({
       ...task,
       urutan: index + 1,
     }));
 
-    setTasks(updatedTasks);
-    setDraggedTaskId(null);
+    const changed = updated.filter((task) => {
+      const before = previous.find((item) => item.id === task.id);
+      return !before || before.urutan !== task.urutan;
+    });
+
+    setTasks(updated);
     setSavingOrder(true);
     setError("");
 
     try {
-      const { error: orderError } = await supabase.from("project1").upsert(
-        updatedTasks.map((task) => ({
-          id: task.id,
-          judul: task.judul,
-          deskripsi: task.deskripsi,
-          deadline: task.deadline,
-          selesai: task.selesai,
-          prioritas: task.prioritas,
-          urutan: task.urutan,
-        })),
-        { onConflict: "id" }
-      );
+      if (changed.length > 0) {
+        const results = await Promise.all(
+          changed.map((task) =>
+            supabase
+              .from("project1")
+              .update({ urutan: task.urutan })
+              .eq("id", task.id)
+          )
+        );
 
-      if (orderError) {
-        throw orderError;
+        const failed = results.find((result) => result.error);
+
+        if (failed?.error) {
+          throw failed.error;
+        }
       }
-      // Berhasil: layar sudah benar, tidak perlu loadTasks() lagi
     } catch (err) {
-      setError(
-        "Gagal menyimpan urutan task. " +
-          (err instanceof Error ? err.message : "")
-      );
+      const message =
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: unknown }).message)
+          : "";
+
+      setError("Gagal menyimpan urutan task. " + message);
 
       await loadTasks(); // kembalikan ke urutan asli kalau gagal
     } finally {
       setSavingOrder(false);
     }
+  }
+
+  function handleDrop(targetId: number) {
+    const draggedId = draggedTaskId;
+
+    setDraggedTaskId(null);
+    setDragOverId(null);
+
+    if (draggedId === null || draggedId === targetId || savingOrder) {
+      return;
+    }
+
+    // Pakai urutan yang sedang tampil di layar
+    const ordered = [...tasks];
+
+    const fromIndex = ordered.findIndex((task) => task.id === draggedId);
+    const toIndex = ordered.findIndex((task) => task.id === targetId);
+
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const [movedTask] = ordered.splice(fromIndex, 1);
+    ordered.splice(toIndex, 0, movedTask);
+
+    persistOrder(ordered);
+  }
+
+  // Alternatif drag-and-drop (untuk HP / layar sentuh)
+  function moveTask(id: number, direction: -1 | 1) {
+    if (savingOrder) return;
+
+    const index = tasks.findIndex((task) => task.id === id);
+    const target = index + direction;
+
+    if (index === -1 || target < 0 || target >= tasks.length) return;
+
+    const ordered = [...tasks];
+    [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+
+    persistOrder(ordered);
   }
 
   // ==========================================
@@ -1116,20 +1139,39 @@ export default function Home() {
                   Belum ada task. Tambahkan task pertamamu!
                 </p>
               ) : (
-                tasks.map((task) => (
+                tasks.map((task, index) => (
                   <div
                     className={`task-row ${
                       draggedTaskId === task.id ? "dragging" : ""
+                    } ${
+                      dragOverId === task.id && draggedTaskId !== task.id
+                        ? "drag-over"
+                        : ""
                     } ${task.selesai ? "completed-row" : ""}`}
                     key={task.id}
                     draggable={!savingOrder}
-                    onDragStart={() => setDraggedTaskId(task.id)}
-                    onDragOver={(e) => e.preventDefault()}
+                    onDragStart={(e) => {
+                      // Firefox wajib ada data agar drag bisa mulai
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", String(task.id));
+                      setDraggedTaskId(task.id);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+
+                      if (draggedTaskId !== null && dragOverId !== task.id) {
+                        setDragOverId(task.id);
+                      }
+                    }}
                     onDrop={(e) => {
                       e.preventDefault();
                       handleDrop(task.id);
                     }}
-                    onDragEnd={() => setDraggedTaskId(null)}
+                    onDragEnd={() => {
+                      setDraggedTaskId(null);
+                      setDragOverId(null);
+                    }}
                   >
                     <div className="drag-handle" aria-hidden="true">
                       ⠿
@@ -1160,6 +1202,28 @@ export default function Home() {
                     </div>
 
                     <div className="task-actions">
+                      <button
+                        type="button"
+                        className="reorder-button"
+                        aria-label="Pindah ke atas"
+                        draggable={false}
+                        disabled={savingOrder || index === 0}
+                        onClick={() => moveTask(task.id, -1)}
+                      >
+                        ▲
+                      </button>
+
+                      <button
+                        type="button"
+                        className="reorder-button"
+                        aria-label="Pindah ke bawah"
+                        draggable={false}
+                        disabled={savingOrder || index === tasks.length - 1}
+                        onClick={() => moveTask(task.id, 1)}
+                      >
+                        ▼
+                      </button>
+
                       <button
                         type="button"
                         className={

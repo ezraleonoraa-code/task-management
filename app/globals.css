@@ -707,6 +707,12 @@ a:focus-visible {
   background: #fafcff;
 }
 
+/* Garis biru = posisi tujuan saat task diseret */
+.task-row.drag-over {
+  background: #eff6ff;
+  box-shadow: inset 0 3px 0 var(--blue);
+}
+
 .drag-handle {
   color: #94a3b8;
   font-size: 23px;
@@ -826,6 +832,11 @@ a:focus-visible {
 
 .task-actions .delete-button:hover {
   background: #fef2f2;
+}
+
+/* Tombol ▲▼: hanya tampil di HP (drag-and-drop tidak jalan di layar sentuh) */
+.task-actions .reorder-button {
+  display: none;
 }
 
 .saving-order {
@@ -1270,6 +1281,11 @@ a:focus-visible {
     min-width: 0;
     padding: 10px 5px;
     font-size: 11px;
+  }
+
+  .task-actions .reorder-button {
+    display: block;
+    flex: 0 0 44px;
   }
 
   .drag-handle {
