@@ -1057,6 +1057,133 @@ a:focus-visible {
 }
 
 /* =====================================
+   GANTT CHART
+===================================== */
+
+.gantt-today-button {
+  margin-left: auto;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.gantt-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.gantt-grid {
+  --gantt-name: 190px;
+  --gantt-week: 34px;
+  display: grid;
+}
+
+.gantt-row {
+  display: contents;
+}
+
+.gantt-corner {
+  grid-row: span 2;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--text);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.gantt-month {
+  grid-column: span 4;
+  padding: 10px 4px;
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
+  background: var(--text);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.gantt-week {
+  padding: 8px 0;
+  border-left: 1px solid #fff;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.gantt-week.current {
+  background: var(--blue);
+  color: #fff;
+}
+
+.gantt-name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: block;
+  min-width: 0;
+  padding: 12px 14px;
+  border: none;
+  border-bottom: 1px solid #edf1f7;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-name:hover {
+  color: var(--blue);
+}
+
+.gantt-name.done {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.gantt-cell {
+  display: flex;
+  padding: 8px 2px;
+  border-bottom: 1px solid #edf1f7;
+  background: #f8fafc;
+}
+
+.gantt-cell.month-start {
+  border-left: 1px solid #e2e8f0;
+}
+
+.gantt-block {
+  flex: 1;
+  min-height: 22px;
+  border-radius: 4px;
+  background: #e2e8f0;
+}
+
+.gantt-block.filled {
+  background: var(--p, #94a3b8);
+}
+
+.gantt-block.filled.done {
+  background: #cbd5e1;
+}
+
+.gantt-note {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* =====================================
    PESAN
 ===================================== */
 
@@ -1351,6 +1478,21 @@ a:focus-visible {
 
   .deadline-side {
     flex-shrink: 0;
+  }
+
+  .gantt-grid {
+    --gantt-name: 120px;
+    --gantt-week: 30px;
+  }
+
+  .gantt-corner {
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .gantt-name {
+    padding: 12px 10px;
+    font-size: 12px;
   }
 }
 

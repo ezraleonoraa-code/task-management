@@ -32,6 +32,10 @@ const MONTH_NAMES = [
 
 const WEEK_DAYS = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 
+// Gantt: tampil 4 bulan, tiap bulan dibagi 4 minggu (tgl 1-7, 8-14, 15-21, 22-akhir)
+const GANTT_MONTHS = 4;
+const GANTT_WEEK_STARTS = [1, 8, 15, 22];
+
 const PRIORITY_LABEL: Record<Priority, string> = {
   Tinggi: "Mendesak",
   Sedang: "Normal",
@@ -90,6 +94,7 @@ export default function Home() {
   const [notificationStatus, setNotificationStatus] = useState("");
   const [activePage, setActivePage] = useState("Dashboard");
   const [calendarDate, setCalendarDate] = useState(new Date(2026, 0, 1));
+  const [ganttStart, setGanttStart] = useState(new Date(2026, 0, 1));
 
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
@@ -101,7 +106,10 @@ export default function Home() {
 
   // Isi kalender dengan tanggal hari ini setelah halaman terbuka di browser
   useEffect(() => {
-    setCalendarDate(new Date());
+    const now = new Date();
+
+    setCalendarDate(now);
+    setGanttStart(new Date(now.getFullYear(), now.getMonth(), 1));
   }, []);
 
   // ==========================================
@@ -607,6 +615,17 @@ export default function Home() {
     );
   }
 
+  function changeGanttMonth(amount: number) {
+    setGanttStart(
+      new Date(ganttStart.getFullYear(), ganttStart.getMonth() + amount, 1)
+    );
+  }
+
+  function goToCurrentGanttMonth() {
+    const now = new Date();
+    setGanttStart(new Date(now.getFullYear(), now.getMonth(), 1));
+  }
+
   // ==========================================
   // CALENDAR COMPONENT
   // ==========================================
@@ -745,6 +764,227 @@ export default function Home() {
   );
 
   // ==========================================
+  // GANTT CHART COMPONENT
+  // Batang task = dari tanggal dibuat sampai deadline
+  // ==========================================
+
+  const renderGantt = () => {
+    const rangeMonths = Array.from({ length: GANTT_MONTHS }, (_, index) => {
+      return new Date(
+        ganttStart.getFullYear(),
+        ganttStart.getMonth() + index,
+        1
+      );
+    });
+
+    const weeks = rangeMonths.flatMap((monthDate) => {
+      const year = monthDate.getFullYear();
+      const month = monthDate.getMonth();
+      const lastDay = new Date(year, month + 1, 0).getDate();
+
+      return GANTT_WEEK_STARTS.map((startDay, index) => {
+        const endDay =
+          index === GANTT_WEEK_STARTS.length - 1 ? lastDay : startDay + 6;
+
+        return {
+          key: `${year}-${month}-${index}`,
+          label: `W${index + 1}`,
+          title: `${startDay}-${endDay} ${MONTH_NAMES[month]} ${year}`,
+          start: new Date(year, month, startDay).getTime(),
+          end: new Date(year, month, endDay, 23, 59, 59, 999).getTime(),
+          firstOfMonth: index === 0,
+        };
+      });
+    });
+
+    const rangeStart = weeks[0].start;
+    const rangeEnd = weeks[weeks.length - 1].end;
+    const now = Date.now();
+
+    const withDeadline = tasks.filter((task) => task.deadline);
+
+    const rows = withDeadline
+      .map((task) => {
+        const created = new Date(task.created_at);
+        const due = new Date(task.deadline!);
+
+        const createdStart = new Date(
+          created.getFullYear(),
+          created.getMonth(),
+          created.getDate()
+        ).getTime();
+
+        const dueStart = new Date(
+          due.getFullYear(),
+          due.getMonth(),
+          due.getDate()
+        ).getTime();
+
+        const dueEnd = new Date(
+          due.getFullYear(),
+          due.getMonth(),
+          due.getDate(),
+          23,
+          59,
+          59,
+          999
+        ).getTime();
+
+        return {
+          task,
+          startMs: Math.min(createdStart, dueStart),
+          endMs: dueEnd,
+          label: `${created.toLocaleDateString("id-ID")} - ${due.toLocaleDateString("id-ID")}`,
+        };
+      })
+      .filter((row) => row.startMs <= rangeEnd && row.endMs >= rangeStart)
+      .sort((a, b) => a.startMs - b.startMs);
+
+    const lastMonth = rangeMonths[rangeMonths.length - 1];
+    const noDeadlineCount = tasks.length - withDeadline.length;
+
+    return (
+      <div className="calendar-card gantt-card">
+        <div className="calendar-header">
+          <button
+            type="button"
+            aria-label="Bulan sebelumnya"
+            onClick={() => changeGanttMonth(-1)}
+          >
+            ←
+          </button>
+
+          <h2>
+            {MONTH_NAMES[ganttStart.getMonth()]} {ganttStart.getFullYear()} -{" "}
+            {MONTH_NAMES[lastMonth.getMonth()]} {lastMonth.getFullYear()}
+          </h2>
+
+          <button
+            type="button"
+            aria-label="Bulan berikutnya"
+            onClick={() => changeGanttMonth(1)}
+          >
+            →
+          </button>
+        </div>
+
+        <div className="calendar-legend">
+          <span>
+            <i className="legend-high" /> Tinggi
+          </span>
+          <span>
+            <i className="legend-medium" /> Sedang
+          </span>
+          <span>
+            <i className="legend-low" /> Rendah
+          </span>
+          <span>
+            <i className="legend-done" /> Selesai
+          </span>
+
+          <button
+            type="button"
+            className="text-button gantt-today-button"
+            onClick={goToCurrentGanttMonth}
+          >
+            Bulan ini
+          </button>
+        </div>
+
+        <p className="calendar-hint">
+          Batang menunjukkan rentang dari tanggal task dibuat sampai deadline.
+          Klik nama task untuk mengedit.
+        </p>
+
+        {rows.length === 0 ? (
+          <p className="empty-state">
+            Belum ada task dengan deadline pada periode ini.
+          </p>
+        ) : (
+          <div className="gantt-scroll">
+            <div
+              className="gantt-grid"
+              style={{
+                gridTemplateColumns: `var(--gantt-name) repeat(${weeks.length}, minmax(var(--gantt-week), 1fr))`,
+                minWidth: `calc(var(--gantt-name) + ${weeks.length} * var(--gantt-week))`,
+              }}
+            >
+              <div className="gantt-corner">Task</div>
+
+              {rangeMonths.map((monthDate) => (
+                <div
+                  className="gantt-month"
+                  key={`${monthDate.getFullYear()}-${monthDate.getMonth()}`}
+                >
+                  {MONTH_NAMES[monthDate.getMonth()]} {monthDate.getFullYear()}
+                </div>
+              ))}
+
+              {weeks.map((week) => (
+                <div
+                  key={week.key}
+                  title={week.title}
+                  className={`gantt-week ${
+                    now >= week.start && now <= week.end ? "current" : ""
+                  }`}
+                >
+                  {week.label}
+                </div>
+              ))}
+
+              {rows.map(({ task, startMs, endMs, label }) => (
+                <div className="gantt-row" key={task.id}>
+                  <button
+                    type="button"
+                    className={`gantt-name ${task.selesai ? "done" : ""}`}
+                    title={task.selesai ? task.judul : `Edit: ${task.judul}`}
+                    onClick={() => editTask(task)}
+                  >
+                    {task.judul}
+                  </button>
+
+                  {weeks.map((week) => {
+                    const active = week.start <= endMs && week.end >= startMs;
+
+                    return (
+                      <div
+                        key={week.key}
+                        className={`gantt-cell ${
+                          week.firstOfMonth ? "month-start" : ""
+                        }`}
+                        title={active ? `${task.judul}: ${label}` : undefined}
+                      >
+                        <span
+                          className={`gantt-block ${
+                            active
+                              ? `filled ${
+                                  task.selesai
+                                    ? "done"
+                                    : PRIORITY_CLASS[getPriority(task)]
+                                }`
+                              : ""
+                          }`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {noDeadlineCount > 0 && (
+          <p className="gantt-note">
+            {noDeadlineCount} task tanpa deadline tidak ditampilkan di Gantt
+            Chart.
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  // ==========================================
   // LAYAR "MEMUAT" (muncul cepat, selagi cek login)
   // Harus setelah SEMUA hook, supaya aturan hooks aman
   // ==========================================
@@ -799,6 +1039,7 @@ export default function Home() {
             { name: "Dashboard", icon: "▦" },
             { name: "Tasks", icon: "☑" },
             { name: "Calendar", icon: "▣" },
+            { name: "Gantt Chart", icon: "▤" },
           ].map((item) => (
             <button
               key={item.name}
@@ -1273,6 +1514,20 @@ export default function Home() {
             </div>
 
             {renderCalendar()}
+          </>
+        )}
+
+        {/* GANTT CHART */}
+        {activePage === "Gantt Chart" && (
+          <>
+            <div className="section-heading">
+              <div>
+                <h2>Gantt Chart</h2>
+                <p>Lihat rentang waktu semua task dalam satu tampilan.</p>
+              </div>
+            </div>
+
+            {renderGantt()}
           </>
         )}
       </main>
