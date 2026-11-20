@@ -89,13 +89,18 @@ export default function Home() {
 
   const [notificationStatus, setNotificationStatus] = useState("");
   const [activePage, setActivePage] = useState("Dashboard");
-  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarDate, setCalendarDate] = useState(new Date(2026, 0, 1));
 
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
 
   const notifiedTasks = useRef<Set<number>>(new Set());
+
+  // Isi kalender dengan tanggal hari ini setelah halaman terbuka di browser
+  useEffect(() => {
+    setCalendarDate(new Date());
+  }, []);
 
   // ==========================================
   // DATA KALENDER DIHITUNG SEKALI
